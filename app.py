@@ -430,14 +430,14 @@ def render_metric_card(col, icon, title, value, description, card_type="light"):
 # ========== HEADER ==========
 st.markdown("""
     <div style="text-align: center; margin-bottom: 30px;">
-        <h1 style="margin: 0; font-size: 32px;">💰 Painel Financeiro Mercado Livre</h1>
+        <h1 style="margin: 0; font-size: 32px;">Painel Financeiro Mercado Livre</h1>
         <p style="color: #7f8c8d; margin-top: 5px; font-size: 16px;">Análise detalhada de vendas, custos e rentabilidade</p>
     </div>
     """, unsafe_allow_html=True)
 
 # ========== SIDEBAR ==========
 with st.sidebar:
-    st.markdown("### 📊 Lógica de Cálculo")
+    st.markdown("### Lógica de Cálculo")
     st.markdown(
         """
         **1. Faturamento Total**  
@@ -466,14 +466,14 @@ with st.sidebar:
         """
     )
     st.divider()
-    st.info("💡 O Repaid captura automaticamente bônus de campanhas (CPC) ou ajustes do Mercado Livre.")
+    st.info("O Repaid captura automaticamente bônus de campanhas (CPC) ou ajustes do Mercado Livre.")
 
 # ========== UPLOAD ==========
-st.markdown('<div class="upload-container"><div class="upload-header">📤 Importar Relatório</div><div class="upload-subtitle">Arraste ou selecione o arquivo .xlsx exportado do Mercado Livre</div></div>', unsafe_allow_html=True)
+st.markdown('<div class="upload-container"><div class="upload-header">Importar Relatório</div><div class="upload-subtitle">Arraste ou selecione o arquivo .xlsx exportado do Mercado Livre</div></div>', unsafe_allow_html=True)
 uploaded_file = st.file_uploader("", type=["xlsx"], label_visibility="collapsed")
 
 if uploaded_file is None:
-    st.info("👆 Aguardando upload da planilha para gerar o painel de análise...")
+    st.info("Aguardando upload da planilha para gerar o painel de análise...")
     st.stop()
 
 try:
@@ -482,47 +482,47 @@ try:
     df = clean_dataframe(raw_df)
     metrics = compute_metrics(df)
 except Exception as exc:
-    st.error("❌ Não foi possível ler o arquivo. Verifique se ele está no padrão exportado pelo Mercado Livre.")
+    st.error("Não foi possível ler o arquivo. Verifique se ele está no padrão exportado pelo Mercado Livre.")
     st.exception(exc)
     st.stop()
 
 if missing_cols:
-    st.warning(f"⚠️ Colunas não encontradas: {', '.join(missing_cols)}")
+    st.warning(f"Colunas não encontradas: {', '.join(missing_cols)}")
 
 # ========== SEÇÃO 1: RECEITAS ==========
-st.markdown("### 📈 Receitas")
+st.markdown("### Receitas")
 col1, col2, col3, col4 = st.columns(4, gap="small")
-render_metric_card(col1, "💵", "Faturamento Total", brl(metrics["faturamento_total"]), "Receita de produtos", "primary")
-render_metric_card(col2, "🚚", "Frete Pago pelo Cliente", brl(metrics["frete_pago_cliente"]), "Receita de envio", "success")
-render_metric_card(col3, "📊", "Base Bruta", brl(metrics["base_bruta_com_frete"]), "Total com frete", "light")
-render_metric_card(col4, "✅", "Faturamento Líquido", brl(metrics["faturamento_liquido"]), "Resultado operacional", "primary")
+render_metric_card(col1, "₹", "Faturamento Total", brl(metrics["faturamento_total"]), "Receita de produtos", "primary")
+render_metric_card(col2, "→", "Frete Pago pelo Cliente", brl(metrics["frete_pago_cliente"]), "Receita de envio", "success")
+render_metric_card(col3, "◆", "Base Bruta", brl(metrics["base_bruta_com_frete"]), "Total com frete", "light")
+render_metric_card(col4, "✓", "Faturamento Líquido", brl(metrics["faturamento_liquido"]), "Resultado operacional", "primary")
 
 # ========== SEÇÃO 2: CUSTOS ==========
-st.markdown("### 💸 Custos e Deduções")
+st.markdown("### Custos e Deduções")
 col5, col6, col7, col8 = st.columns(4, gap="small")
-render_metric_card(col5, "❌", "Vendas Canceladas", brl(metrics["cancelamentos"]), "Cancelamentos e reembolsos", "danger")
-render_metric_card(col6, "%", "Comissão Total", brl(metrics["comissao"]), "Tarifa de venda e impostos", "warning")
-render_metric_card(col7, "🚛", "Frete Cobrado", brl(metrics["frete_cobrado"]), "Tarifas de envio", "warning")
-render_metric_card(col8, "🎁", "Repaid / Benefícios", brl(metrics["repaid_total"]), "Bônus de campanhas", "success")
+render_metric_card(col5, "✕", "Vendas Canceladas", brl(metrics["cancelamentos"]), "Cancelamentos e reembolsos", "danger")
+render_metric_card(col6, "◆", "Comissão Total", brl(metrics["comissao"]), "Tarifa de venda e impostos", "warning")
+render_metric_card(col7, "→", "Frete Cobrado", brl(metrics["frete_cobrado"]), "Tarifas de envio", "warning")
+render_metric_card(col8, "⬆", "Repaid / Benefícios", brl(metrics["repaid_total"]), "Bônus de campanhas", "success")
 
 # ========== SEÇÃO 3: RESULTADO FINAL ==========
-st.markdown("### 🎯 Resultado Final")
+st.markdown("### Resultado Final")
 col_result1, col_result2 = st.columns(2, gap="large")
 with col_result1:
-    render_metric_card(st.columns(1)[0], "📦", "Repasse Previsto", brl(metrics["repasse_previsto"]), "Valor final a receber", "primary")
+    render_metric_card(st.columns(1)[0], "◆", "Repasse Previsto", brl(metrics["repasse_previsto"]), "Valor final a receber", "primary")
 with col_result2:
-    render_metric_card(st.columns(1)[0], "📈", "Pedidos Enviados", str(metrics["pedidos_enviados"]), "Total de pedidos", "light")
+    render_metric_card(st.columns(1)[0], "↑", "Pedidos Enviados", str(metrics["pedidos_enviados"]), "Total de pedidos", "light")
 
 # ========== SEÇÃO 4: INDICADORES ==========
-st.markdown("### 📊 Indicadores de Performance")
+st.markdown("### Indicadores de Performance")
 ind_col1, ind_col2 = st.columns(2, gap="large")
 with ind_col1:
-    render_metric_card(st.columns(1)[0], "📉", "% Cancelamento", pct(metrics["cancel_pct"]), "Sobre faturamento total", "light")
+    render_metric_card(st.columns(1)[0], "↓", "% Cancelamento", pct(metrics["cancel_pct"]), "Sobre faturamento total", "light")
 with ind_col2:
-    render_metric_card(st.columns(1)[0], "%", "Peso da Comissão", pct(metrics["comissao_pct"]), "Sobre faturamento total", "light")
+    render_metric_card(st.columns(1)[0], "◆", "Peso da Comissão", pct(metrics["comissao_pct"]), "Sobre faturamento total", "light")
 
 # ========== GRÁFICOS ==========
-st.markdown("### 📉 Análise Visual")
+st.markdown("### Análise Visual")
 fig_donut, fig_bar = build_charts(metrics)
 chart_col1, chart_col2 = st.columns(2, gap="large")
 with chart_col1:
@@ -533,20 +533,20 @@ with chart_col2:
     st.plotly_chart(fig_bar, use_container_width=True)
 
 # ========== INSIGHTS ==========
-st.markdown("### 💡 Insights Automáticos")
+st.markdown("### Insights Automáticos")
 insight_col1, insight_col2, insight_col3 = st.columns(3, gap="medium")
 with insight_col1:
-    st.success(f"✓ Cancelamentos: {pct(metrics['cancel_pct'])} do faturamento")
+    st.success(f"Cancelamentos: {pct(metrics['cancel_pct'])} do faturamento")
 with insight_col2:
-    st.info(f"ℹ Comissão: {pct(metrics['comissao_pct'])} do faturamento")
+    st.info(f"Comissão: {pct(metrics['comissao_pct'])} do faturamento")
 with insight_col3:
     if metrics["repaid_total"] > 0:
-        st.success(f"✓ Benefícios extras: {brl(metrics['repaid_total'])}")
+        st.success(f"Benefícios extras: {brl(metrics['repaid_total'])}")
     else:
-        st.warning("⚠ Nenhum benefício extra detectado")
+        st.warning("Nenhum benefício extra detectado")
 
 # ========== FILTROS ==========
-st.markdown("### 🔍 Filtros e Análise Detalhada")
+st.markdown("### Filtros e Análise Detalhada")
 f1, f2, f3 = st.columns(3, gap="medium")
 
 with f1:
@@ -578,18 +578,18 @@ if selected_canais and "Canal de venda" in filtered_df.columns:
     filtered_df = filtered_df[filtered_df["Canal de venda"].isin(selected_canais)]
 
 # ========== TABELA ==========
-st.markdown("### 📋 Detalhamento de Pedidos")
+st.markdown("### Detalhamento de Pedidos")
 download_df = dataframe_for_download(filtered_df)
 st.dataframe(download_df, use_container_width=True, height=420)
 
 # ========== DOWNLOADS ==========
-st.markdown("### 💾 Exportar Dados")
+st.markdown("### Exportar Dados")
 col_csv, col_txt = st.columns(2, gap="medium")
 
 with col_csv:
     csv_data = download_df.to_csv(index=False).encode("utf-8-sig")
     st.download_button(
-        "📥 Baixar CSV",
+        "Baixar CSV",
         data=csv_data,
         file_name="pedidos_filtrados_mercado_livre.csv",
         mime="text/csv",
@@ -622,7 +622,7 @@ INDICADORES:
     """.strip()
     
     st.download_button(
-        "📄 Baixar Resumo TXT",
+        "Baixar Resumo TXT",
         data=summary_text.encode("utf-8"),
         file_name="resumo_financeiro_mercado_livre.txt",
         mime="text/plain",
