@@ -139,25 +139,8 @@ def clean_dataframe(df: pd.DataFrame) -> pd.DataFrame:
         regex=True,
     )
 
-    # Lógica de cálculo conforme o usuário explicou
-    receita_produtos = df.get("Receita por produtos (BRL)", pd.Series(0, index=df.index)).fillna(0)
-    receita_acrescimo = df.get("Receita por acréscimo no preço (pago pelo comprador)", pd.Series(0, index=df.index)).fillna(0)
-    taxa_parcelamento = df.get("Taxa de parcelamento equivalente ao acréscimo", pd.Series(0, index=df.index)).fillna(0)
-    comissao = df.get("Tarifa de venda e impostos (BRL)", pd.Series(0, index=df.index)).fillna(0)
-    tarifas_envio = df.get("Tarifas de envio (BRL)", pd.Series(0, index=df.index)).fillna(0)
-    cancelamentos = df.get("Cancelamentos e reembolsos (BRL)", pd.Series(0, index=df.index)).fillna(0)
-    total_reportado = df.get("Total (BRL)", pd.Series(0, index=df.index)).fillna(0)
-
-    # Cálculo base (sem benefícios/repaid)
-    # Nota: comissao, tarifas_envio e cancelamentos costumam vir negativos no relatório, por isso somamos
-    df["calculo_base"] = receita_produtos + receita_acrescimo - taxa_parcelamento + comissao + tarifas_envio + cancelamentos
-    
-    # O Repaid é a diferença positiva entre o que o ML reportou e o nosso cálculo base
-    # Ajuste: arredondar para evitar erros de precisão de ponto flutuante
-    df["repaid_beneficio"] = (total_reportado - df["calculo_base"]).round(2).clip(lower=0)
-    
-    # Repasse base é o total reportado
-    df["repasse_base"] = total_reportado
+    # Repasse base é o total reportado pelo Mercado Livre
+    df["repasse_base"] = df.get("Total (BRL)", pd.Series(0, index=df.index)).fillna(0)
 
     return df
 
@@ -168,16 +151,22 @@ def compute_metrics(df: pd.DataFrame) -> dict:
     cancelamentos = df.get("Cancelamentos e reembolsos (BRL)", pd.Series(dtype=float)).abs().sum()
     comissao = df.get("Tarifa de venda e impostos (BRL)", pd.Series(dtype=float)).abs().sum()
     frete_cobrado = df.get("Tarifas de envio (BRL)", pd.Series(dtype=float)).abs().sum()
-    repaid_total = df.get("repaid_beneficio", pd.Series(0, index=df.index)).sum()
     
     pedidos_enviados = int(df["is_sent"].sum()) if "is_sent" in df.columns else 0
 
-    # Faturamento líquido agora inclui o benefício/repaid
-    # Lógica: Faturamento Total - Taxas + Repaid
-    faturamento_liquido = faturamento_total - cancelamentos - comissao - frete_cobrado + repaid_total
+    # Faturamento Líquido Base (sem benefícios)
+    faturamento_liquido_base = faturamento_total - cancelamentos - comissao - frete_cobrado
 
+    # Repasse Previsto (Total reportado para pedidos não cancelados)
     nao_cancelados = ~df.get("is_cancelled", pd.Series(False, index=df.index))
     repasse_previsto = df.loc[nao_cancelados, "repasse_base"].sum() if "repasse_base" in df.columns else 0
+
+    # Repaid / Benefícios: Diferença entre o Repasse Previsto e o Faturamento Líquido Base
+    # Se o Repasse Previsto for maior que o cálculo base, a diferença é o benefício
+    repaid_total = max(0, repasse_previsto - faturamento_liquido_base)
+    
+    # Faturamento Líquido Final (agora inclui o Repaid)
+    faturamento_liquido = faturamento_liquido_base + repaid_total
 
     base_bruta_com_frete = faturamento_total + frete_pago_cliente
 
@@ -205,7 +194,7 @@ def dataframe_for_download(df):
         "Canal de venda", "Forma de entrega", "Receita por produtos (BRL)",
         "Receita por envio (BRL)", "Cancelamentos e reembolsos (BRL)",
         "Tarifa de venda e impostos (BRL)", "Tarifas de envio (BRL)",
-        "Total (BRL)", "repaid_beneficio", "repasse_base", "is_cancelled", "is_sent"
+        "Total (BRL)", "repasse_base", "is_cancelled", "is_sent"
     ] if c in df.columns]
     return df[export_cols].copy()
 
@@ -351,7 +340,7 @@ with st.sidebar:
         Soma absoluta da coluna `Tarifas de envio (BRL)`.
 
         **Repaid / Benefícios**  
-        Diferença positiva entre o `Total (BRL)` reportado e o cálculo base (Produtos + Acréscimo - Taxas - Frete). Representa bônus de campanhas como CPC.
+        Diferença entre o `Repasse Previsto` e o `Faturamento Líquido Base`. Representa bônus de campanhas como CPC.
 
         **Faturamento líquido**  
         `Faturamento` - cancelamentos - comissão - frete cobrado + Repaid.
