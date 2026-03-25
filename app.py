@@ -1,12 +1,12 @@
-import io
-from datetime import datetime, timedelta
 import pandas as pd
 import plotly.express as px
 import streamlit as st
+from datetime import datetime
+import re
 
 st.set_page_config(
-    page_title="Painel de Repasse Mercado Livre",
-    page_icon="💸",
+    page_title="Painel Financeiro Mercado Livre",
+    page_icon="💰",
     layout="wide",
 )
 
@@ -33,13 +33,11 @@ EXPECTED_COLUMNS = [
     "Descrição do status",
     "Receita por produtos (BRL)",
     "Tarifa de venda e impostos (BRL)",
+    "Tarifas de envio (BRL)",
     "Cancelamentos e reembolsos (BRL)",
     "Total (BRL)",
-    "Título do anúncio",
-    "Canal de venda",
-    "Forma de entrega",
-    "Data de entrega",
 ]
+
 
 def brl(value: float) -> str:
     try:
@@ -47,19 +45,23 @@ def brl(value: float) -> str:
     except Exception:
         return "R$ 0,00"
 
+
 def pct(value: float) -> str:
     return f"{value:.1%}".replace(".", ",")
+
 
 def normalize_text(value) -> str:
     if pd.isna(value):
         return ""
     return str(value).strip()
 
+
 def parse_brazilian_datetime(value):
     if pd.isna(value):
         return pd.NaT
     if isinstance(value, pd.Timestamp):
         return value
+
     text = str(value).strip().replace(" hs.", "").replace(" hs", "")
     for fmt in ("%d/%m/%Y %H:%M", "%Y-%m-%d %H:%M:%S", "%d/%m/%Y"):
         try:
@@ -67,7 +69,7 @@ def parse_brazilian_datetime(value):
         except Exception:
             pass
 
-    match = __import__("re").match(r"(\d{1,2}) de ([^ ]+) de (\d{4})(?: (\d{1,2}):(\d{2}))?$", text.lower())
+    match = re.match(r"(\d{1,2}) de ([^ ]+) de (\d{4})(?: (\d{1,2}):(\d{2}))?$", text.lower())
     if match:
         day = int(match.group(1))
         month_name = match.group(2)
@@ -79,6 +81,7 @@ def parse_brazilian_datetime(value):
             return pd.Timestamp(year=year, month=month, day=day, hour=hour, minute=minute)
     return pd.NaT
 
+
 @st.cache_data(show_spinner=False)
 def load_excel(uploaded_file):
     xls = pd.ExcelFile(uploaded_file)
@@ -86,6 +89,8 @@ def load_excel(uploaded_file):
     df = pd.read_excel(uploaded_file, sheet_name=target_sheet, header=5)
     df.columns = [str(c).strip() for c in df.columns]
     return df
+
+
 
 def clean_dataframe(df: pd.DataFrame) -> pd.DataFrame:
     df = df.copy()
@@ -113,11 +118,6 @@ def clean_dataframe(df: pd.DataFrame) -> pd.DataFrame:
     else:
         df["data_venda_dt"] = pd.NaT
 
-    if "Data de entrega" in df.columns:
-        df["data_entrega_dt"] = df["Data de entrega"].apply(parse_brazilian_datetime)
-    else:
-        df["data_entrega_dt"] = pd.NaT
-
     if "Estado" not in df.columns:
         df["Estado"] = ""
     if "Descrição do status" not in df.columns:
@@ -137,79 +137,78 @@ def clean_dataframe(df: pd.DataFrame) -> pd.DataFrame:
         na=False,
     )
 
-    delivered_by_date = df["data_entrega_dt"].notna()
-    delivered_by_text = status_mix.str.contains("entreg", regex=True, na=False)
-    df["is_delivered"] = delivered_by_date | delivered_by_text
-
-    df["repasse_ate_7d"] = (
-        df["is_delivered"]
-        & (~df["is_cancelled"])
-        & (
-            df["data_entrega_dt"].between(
-                pd.Timestamp.today().normalize() - pd.Timedelta(days=7),
-                pd.Timestamp.today().normalize() + pd.Timedelta(days=7),
-                inclusive="both",
-            )
-            | df["data_entrega_dt"].isna()
-        )
-    )
-
-    df["repasse_apos_7d"] = (
-        (~df["is_cancelled"])
-        & (~df["repasse_ate_7d"])
-        & df["is_sent"]
-    )
-
     return df
+
+
 
 def compute_metrics(df: pd.DataFrame) -> dict:
     faturamento_total = df.get("Receita por produtos (BRL)", pd.Series(dtype=float)).sum()
     cancelamentos = df.get("Cancelamentos e reembolsos (BRL)", pd.Series(dtype=float)).abs().sum()
     comissao = df.get("Tarifa de venda e impostos (BRL)", pd.Series(dtype=float)).abs().sum()
+    frete_cobrado = df.get("Tarifas de envio (BRL)", pd.Series(dtype=float)).abs().sum()
     pedidos_enviados = int(df["is_sent"].sum()) if "is_sent" in df.columns else 0
-    repasse_7 = df.loc[df["repasse_ate_7d"], "Total (BRL)"].sum() if "repasse_ate_7d" in df.columns else 0
-    repasse_mais_7 = df.loc[df["repasse_apos_7d"], "Total (BRL)"].sum() if "repasse_apos_7d" in df.columns else 0
+
+    faturamento_liquido = faturamento_total - cancelamentos - comissao - frete_cobrado
+    faturamento_liquido = max(float(faturamento_liquido), 0.0)
+
+    nao_cancelados = ~df.get("is_cancelled", pd.Series(False, index=df.index))
+    repasse_previsto = df.loc[nao_cancelados, "Total (BRL)"].clip(lower=0).sum() if "Total (BRL)" in df.columns else 0
 
     return {
         "faturamento_total": float(faturamento_total),
         "cancelamentos": float(cancelamentos),
         "comissao": float(comissao),
+        "frete_cobrado": float(frete_cobrado),
+        "faturamento_liquido": float(faturamento_liquido),
         "pedidos_enviados": int(pedidos_enviados),
-        "repasse_7": float(repasse_7),
-        "repasse_7_pct": float(repasse_7 / faturamento_total) if faturamento_total else 0,
-        "repasse_mais_7": float(repasse_mais_7),
-        "repasse_mais_7_pct": float(repasse_mais_7 / faturamento_total) if faturamento_total else 0,
-        "liquido_potencial": float(max(faturamento_total - cancelamentos - comissao, 0)),
+        "repasse_previsto": float(repasse_previsto),
+        "repasse_previsto_pct": float(repasse_previsto / faturamento_total) if faturamento_total else 0,
         "cancel_pct": float(cancelamentos / faturamento_total) if faturamento_total else 0,
         "comissao_pct": float(comissao / faturamento_total) if faturamento_total else 0,
+        "frete_pct": float(frete_cobrado / faturamento_total) if faturamento_total else 0,
     }
+
+
 
 def dataframe_for_download(df):
     export_cols = [c for c in [
         "N.º de venda", "Data da venda", "Estado", "Descrição do status", "Título do anúncio",
-        "Canal de venda", "Forma de entrega", "Data de entrega", "Receita por produtos (BRL)",
-        "Cancelamentos e reembolsos (BRL)", "Tarifa de venda e impostos (BRL)", "Total (BRL)",
-        "is_cancelled", "is_sent", "is_delivered", "repasse_ate_7d", "repasse_apos_7d"
+        "Canal de venda", "Forma de entrega", "Receita por produtos (BRL)",
+        "Cancelamentos e reembolsos (BRL)", "Tarifa de venda e impostos (BRL)",
+        "Tarifas de envio (BRL)", "Total (BRL)", "is_cancelled", "is_sent"
     ] if c in df.columns]
     return df[export_cols].copy()
 
+
+
 def build_charts(metrics):
-    donut_df = pd.DataFrame({
-        "Categoria": ["Líquido potencial", "Cancelado", "Comissão"],
-        "Valor": [metrics["liquido_potencial"], metrics["cancelamentos"], metrics["comissao"]],
+    composicao_df = pd.DataFrame({
+        "Categoria": ["Faturamento líquido", "Cancelado", "Comissão", "Frete cobrado"],
+        "Valor": [
+            metrics["faturamento_liquido"],
+            metrics["cancelamentos"],
+            metrics["comissao"],
+            metrics["frete_cobrado"],
+        ],
     })
-    fig_donut = px.pie(donut_df, names="Categoria", values="Valor", hole=0.55)
+    fig_donut = px.pie(composicao_df, names="Categoria", values="Valor", hole=0.55)
 
-    repasse_df = pd.DataFrame({
-        "Faixa": ["Até 7 dias", "Após 7 dias"],
-        "Valor": [metrics["repasse_7"], metrics["repasse_mais_7"]],
+    comparativo_df = pd.DataFrame({
+        "Indicador": ["Faturamento total", "Repasse previsto", "Faturamento líquido"],
+        "Valor": [
+            metrics["faturamento_total"],
+            metrics["repasse_previsto"],
+            metrics["faturamento_liquido"],
+        ],
     })
-    fig_bar = px.bar(repasse_df, x="Faixa", y="Valor", text_auto=".2s")
-
+    fig_bar = px.bar(comparativo_df, x="Indicador", y="Valor", text_auto=".2s")
     return fig_donut, fig_bar
 
-st.title("Painel de Repasse Mercado Livre")
-st.caption("Faça upload do relatório de vendas do Mercado Livre em Excel e veja os indicadores de faturamento, cancelamento, comissão e previsão estimada de repasse.")
+
+st.title("Painel Financeiro Mercado Livre")
+st.caption(
+    "Faça upload do relatório de vendas do Mercado Livre em Excel e veja os indicadores principais de faturamento, cancelamento, comissão, frete e repasse previsto."
+)
 
 with st.sidebar:
     st.header("Como o cálculo funciona")
@@ -221,20 +220,22 @@ with st.sidebar:
         **Vendas canceladas**  
         Soma absoluta da coluna `Cancelamentos e reembolsos (BRL)` e leitura do status.
 
-        **Comissão total descontada**  
+        **Comissão total**  
         Soma absoluta da coluna `Tarifa de venda e impostos (BRL)`.
 
-        **Pedidos enviados**  
-        Contagem de pedidos com indícios logísticos de envio, coleta, entrega, etiqueta ou trânsito.
+        **Frete cobrado total**  
+        Soma absoluta da coluna `Tarifas de envio (BRL)`.
 
-        **Repasse até 7 dias**  
-        Estimativa baseada em pedidos entregues recentemente e sem sinais de cancelamento.
+        **Faturamento líquido**  
+        Faturamento total menos cancelamentos, comissão e frete cobrado.
 
-        **Repasse após 7 dias**  
-        Estimativa baseada em pedidos ainda enviados, em rota ou preparação logística sem cancelamento.
+        **Repasse previsto**  
+        Soma da coluna `Total (BRL)` apenas para pedidos sem sinal de cancelamento ou reembolso.
         """
     )
-    st.warning("A previsão de repasse é uma estimativa operacional. Para valor financeiro exato, cruze com o extrato do Mercado Pago ou relatório financeiro do Mercado Livre.")
+    st.warning(
+        "O repasse previsto é uma estimativa com base nas informações do relatório de vendas. O valor financeiro real pode variar conforme liberações e ajustes do Mercado Livre."
+    )
 
 uploaded_file = st.file_uploader("Envie o arquivo .xlsx do relatório de vendas", type=["xlsx"])
 
@@ -255,15 +256,15 @@ except Exception as exc:
 if missing_cols:
     st.warning("Algumas colunas esperadas não foram encontradas. O app tentou continuar com o que estava disponível.")
 
-col1, col2, col3, col4 = st.columns(4)
+col1, col2, col3, col4, col5 = st.columns(5)
 col1.metric("Faturamento total", brl(metrics["faturamento_total"]))
 col2.metric("Vendas canceladas", brl(metrics["cancelamentos"]))
 col3.metric("Comissão total", brl(metrics["comissao"]))
-col4.metric("Pedidos enviados", f'{metrics["pedidos_enviados"]:,}'.replace(",", "."))
+col4.metric("Frete cobrado total", brl(metrics["frete_cobrado"]))
+col5.metric("Faturamento líquido", brl(metrics["faturamento_liquido"]))
 
-col5, col6, col7, col8 = st.columns(4)
-col5.metric("Repasse até 7 dias", brl(metrics["repasse_7"]), pct(metrics["repasse_7_pct"]))
-col6.metric("Repasse após 7 dias", brl(metrics["repasse_mais_7"]), pct(metrics["repasse_mais_7_pct"]))
+col6, col7, col8 = st.columns(3)
+col6.metric("Repasse previsto", brl(metrics["repasse_previsto"]), pct(metrics["repasse_previsto_pct"]))
 col7.metric("Percentual de cancelamento", pct(metrics["cancel_pct"]))
 col8.metric("Peso da comissão", pct(metrics["comissao_pct"]))
 
@@ -271,17 +272,17 @@ fig_donut, fig_bar = build_charts(metrics)
 
 chart_col1, chart_col2 = st.columns(2)
 with chart_col1:
-    st.subheader("Composição do faturamento")
+    st.subheader("Composição financeira")
     st.plotly_chart(fig_donut, use_container_width=True)
 with chart_col2:
-    st.subheader("Previsão de repasses")
+    st.subheader("Comparativo geral")
     st.plotly_chart(fig_bar, use_container_width=True)
 
 st.subheader("Insights automáticos")
 insight_col1, insight_col2, insight_col3 = st.columns(3)
 insight_col1.success(f"Cancelamentos representam {pct(metrics['cancel_pct'])} do faturamento bruto.")
 insight_col2.info(f"A comissão consome {pct(metrics['comissao_pct'])} do faturamento bruto.")
-insight_col3.warning(f"O repasse estimado de curto prazo representa {pct(metrics['repasse_7_pct'])} do faturamento bruto.")
+insight_col3.warning(f"O repasse previsto representa {pct(metrics['repasse_previsto_pct'])} do faturamento bruto.")
 
 st.subheader("Filtros")
 f1, f2, f3 = st.columns(3)
@@ -313,8 +314,9 @@ if isinstance(selected_period, tuple) and len(selected_period) == 2 and df["data
 st.subheader("Tabela de pedidos")
 display_cols = [c for c in [
     "N.º de venda", "Data da venda", "Estado", "Descrição do status", "Título do anúncio",
-    "Canal de venda", "Forma de entrega", "Data de entrega",
-    "Receita por produtos (BRL)", "Cancelamentos e reembolsos (BRL)", "Tarifa de venda e impostos (BRL)", "Total (BRL)"
+    "Canal de venda", "Forma de entrega", "Receita por produtos (BRL)",
+    "Cancelamentos e reembolsos (BRL)", "Tarifa de venda e impostos (BRL)",
+    "Tarifas de envio (BRL)", "Total (BRL)"
 ] if c in filtered_df.columns]
 st.dataframe(filtered_df[display_cols], use_container_width=True, hide_index=True)
 
@@ -327,23 +329,23 @@ st.download_button(
 )
 
 summary_text = f"""
-Painel de Repasse Mercado Livre
+Painel Financeiro Mercado Livre
 
 Faturamento total: {brl(metrics["faturamento_total"])}
 Vendas canceladas: {brl(metrics["cancelamentos"])}
 Comissão total: {brl(metrics["comissao"])}
-Pedidos enviados: {metrics["pedidos_enviados"]}
-Repasse até 7 dias: {brl(metrics["repasse_7"])} ({pct(metrics["repasse_7_pct"])})
-Repasse após 7 dias: {brl(metrics["repasse_mais_7"])} ({pct(metrics["repasse_mais_7_pct"])})
+Frete cobrado total: {brl(metrics["frete_cobrado"])}
+Faturamento líquido: {brl(metrics["faturamento_liquido"])}
+Repasse previsto: {brl(metrics["repasse_previsto"])} ({pct(metrics["repasse_previsto_pct"])})
 Percentual de cancelamento: {pct(metrics["cancel_pct"])}
 Peso da comissão: {pct(metrics["comissao_pct"])}
 
 Aviso:
-A previsão de repasse é estimada com base no comportamento logístico e nos status presentes no relatório de vendas.
+O repasse previsto é uma estimativa feita com base nas informações disponíveis no relatório de vendas.
 """
 st.download_button(
     label="Baixar resumo em TXT",
     data=summary_text.encode("utf-8"),
-    file_name="resumo_painel_repasse.txt",
+    file_name="resumo_painel_financeiro.txt",
     mime="text/plain",
 )
