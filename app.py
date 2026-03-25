@@ -155,19 +155,18 @@ def compute_metrics(df: pd.DataFrame) -> dict:
     pedidos_enviados = int(df["is_sent"].sum()) if "is_sent" in df.columns else 0
 
     # Faturamento Líquido Base (sem benefícios)
-    faturamento_liquido_base = faturamento_total - cancelamentos - comissao - frete_cobrado
+    # Representa o resultado real da venda: Faturamento - Taxas
+    faturamento_liquido = faturamento_total - cancelamentos - comissao - frete_cobrado
 
     # Repasse Previsto (Total reportado para pedidos não cancelados)
+    # Representa o valor final que o ML paga (incluindo bônus/repaid)
     nao_cancelados = ~df.get("is_cancelled", pd.Series(False, index=df.index))
     repasse_previsto = df.loc[nao_cancelados, "repasse_base"].sum() if "repasse_base" in df.columns else 0
 
     # Repaid / Benefícios: Diferença entre o Repasse Previsto e o Faturamento Líquido Base
     # Se o Repasse Previsto for maior que o cálculo base, a diferença é o benefício
-    repaid_total = max(0, repasse_previsto - faturamento_liquido_base)
+    repaid_total = max(0, repasse_previsto - faturamento_liquido)
     
-    # Faturamento Líquido Final (agora inclui o Repaid)
-    faturamento_liquido = faturamento_liquido_base + repaid_total
-
     base_bruta_com_frete = faturamento_total + frete_pago_cliente
 
     return {
@@ -340,10 +339,10 @@ with st.sidebar:
         Soma absoluta da coluna `Tarifas de envio (BRL)`.
 
         **Repaid / Benefícios**  
-        Diferença entre o `Repasse Previsto` e o `Faturamento Líquido Base`. Representa bônus de campanhas como CPC.
+        Diferença entre o `Repasse Previsto` e o `Faturamento Líquido`. Representa bônus de campanhas como CPC.
 
         **Faturamento líquido**  
-        `Faturamento` - cancelamentos - comissão - frete cobrado + Repaid.
+        `Faturamento` - cancelamentos - comissão - frete cobrado.
 
         **Repasse previsto**  
         Soma do `Total (BRL)` para pedidos sem sinal de cancelamento.
@@ -425,7 +424,7 @@ render_metric_card(
     "✅",
     "Faturamento Líquido",
     brl(metrics["faturamento_liquido"]),
-    "Faturamento - taxas + benefícios",
+    "Faturamento - taxas",
     bg_color="#fffbf0"
 )
 render_metric_card(
@@ -531,7 +530,7 @@ st.download_button(
     "Baixar tabela filtrada em CSV",
     data=csv_data,
     file_name="pedidos_filtrados_mercado_livre.csv",
-    mime="text/csv",
+    regex="text/csv",
 )
 
 summary_text = f"""
