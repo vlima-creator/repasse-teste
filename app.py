@@ -164,7 +164,6 @@ def compute_metrics(df: pd.DataFrame) -> dict:
     repasse_previsto = df.loc[nao_cancelados, "repasse_base"].sum() if "repasse_base" in df.columns else 0
 
     # Repaid / Benefícios: Diferença entre o Repasse Previsto e o Faturamento Líquido Base
-    # Se o Repasse Previsto for maior que o cálculo base, a diferença é o benefício
     repaid_total = max(0, repasse_previsto - faturamento_liquido)
     
     base_bruta_com_frete = faturamento_total + frete_pago_cliente
@@ -371,10 +370,10 @@ except Exception as exc:
 if missing_cols:
     st.warning("Algumas colunas esperadas não foram encontradas. O app tentou continuar com o que estava disponível.")
 
-# ========== SEÇÃO DE CARDS PRINCIPAIS ==========
+# ========== SEÇÃO DE CARDS PRINCIPAIS (8 CARDS) ==========
 st.markdown("---")
 
-# Primeira linha de cards (4 colunas para acomodar o Repaid)
+# Primeira linha de cards (4 cards)
 col1, col2, col3, col4 = st.columns(4, gap="small")
 render_metric_card(
     col1, 
@@ -386,6 +385,14 @@ render_metric_card(
 )
 render_metric_card(
     col2,
+    "🚚",
+    "Frete Pago pelo Cliente",
+    brl(metrics["frete_pago_cliente"]),
+    "Receita por envio (pago pelo comprador)",
+    bg_color="white"
+)
+render_metric_card(
+    col3,
     "❌",
     "Vendas Canceladas",
     brl(metrics["cancelamentos"]),
@@ -393,27 +400,19 @@ render_metric_card(
     bg_color="white"
 )
 render_metric_card(
-    col3,
+    col4,
     "%",
     "Comissão Total",
     brl(metrics["comissao"]),
     "Tarifa de venda e impostos",
     bg_color="#fffbf0"
 )
-render_metric_card(
-    col4,
-    "🎁",
-    "Repaid / Benefícios",
-    brl(metrics["repaid_total"]),
-    "Bônus de campanhas (CPC, etc)",
-    bg_color="#f0fff4" # Verde clarinho para destacar benefício
-)
 
-# Segunda linha de cards
+# Segunda linha de cards (4 cards)
 col5, col6, col7, col8 = st.columns(4, gap="small")
 render_metric_card(
     col5,
-    "🚚",
+    "🚛",
     "Frete Cobrado Total",
     brl(metrics["frete_cobrado"]),
     "Tarifas de envio descontadas",
@@ -437,22 +436,22 @@ render_metric_card(
 )
 render_metric_card(
     col8,
-    "📈",
-    "Pedidos Enviados",
-    str(metrics["pedidos_enviados"]),
-    "Total de pedidos com status de envio",
-    bg_color="white"
+    "🎁",
+    "Repaid / Benefícios",
+    brl(metrics["repaid_total"]),
+    "Bônus de campanhas (CPC, etc)",
+    bg_color="#f0fff4"
 )
 
-# ========== SEÇÃO DE INDICADORES ==========
+# ========== SEÇÃO DE INDICADORES (2 CARDS) ==========
 st.markdown("---")
 st.subheader("Indicadores")
 
-ind_col1, ind_col2, ind_col3 = st.columns(3, gap="medium")
+ind_col1, ind_col2 = st.columns(2, gap="medium")
 render_indicator_card(
     ind_col1,
     "📊",
-    "% Cancelamento",
+    "Percentual de Cancelamento",
     pct(metrics["cancel_pct"]),
     "sobre o faturamento total"
 )
@@ -462,13 +461,6 @@ render_indicator_card(
     "Peso da Comissão",
     pct(metrics["comissao_pct"]),
     "sobre o faturamento total"
-)
-render_indicator_card(
-    ind_col3,
-    "✨",
-    "Impacto Benefícios",
-    pct(metrics["repaid_pct"]),
-    "ganho extra sobre faturamento"
 )
 
 st.markdown("---")
@@ -530,21 +522,22 @@ st.download_button(
     "Baixar tabela filtrada em CSV",
     data=csv_data,
     file_name="pedidos_filtrados_mercado_livre.csv",
-    regex="text/csv",
+    mime="text/csv",
 )
 
 summary_text = f"""
 Painel Financeiro Mercado Livre
 
 Faturamento total: {brl(metrics['faturamento_total'])}
+Frete pago pelo cliente: {brl(metrics['frete_pago_cliente'])}
 Vendas canceladas: {brl(metrics['cancelamentos'])}
 Comissão total: {brl(metrics['comissao'])}
 Frete cobrado total: {brl(metrics['frete_cobrado'])}
-Repaid / Benefícios: {brl(metrics['repaid_total'])}
 Faturamento líquido: {brl(metrics['faturamento_liquido'])}
 Repasse previsto: {brl(metrics['repasse_previsto'])}
 Percentual de cancelamento: {pct(metrics['cancel_pct'])}
 Peso da comissão: {pct(metrics['comissao_pct'])}
+Repaid / Benefícios: {brl(metrics['repaid_total'])}
 """.strip()
 
 st.download_button(
