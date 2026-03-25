@@ -1,5 +1,6 @@
 
 import pandas as pd
+import plotly.graph_objects as go
 import plotly.express as px
 import streamlit as st
 from datetime import datetime
@@ -9,55 +10,222 @@ st.set_page_config(
     page_title="Painel Financeiro Mercado Livre",
     page_icon="💰",
     layout="wide",
+    initial_sidebar_state="expanded"
 )
 
-# Estilo CSS customizado para a área de upload e cards
+# ========== TEMA E ESTILOS PROFISSIONAIS ==========
 st.markdown("""
     <style>
-    .stFileUploader {
-        background-color: #f8f9fa;
-        border: 2px dashed #ffdb4d;
-        border-radius: 15px;
-        padding: 20px;
+    /* Variáveis de cor */
+    :root {
+        --primary: #2c3e50;
+        --secondary: #3498db;
+        --success: #27ae60;
+        --warning: #f39c12;
+        --danger: #e74c3c;
+        --light-bg: #ecf0f1;
+        --card-bg: #ffffff;
+        --text-dark: #2c3e50;
+        --text-light: #7f8c8d;
+        --border-color: #bdc3c7;
     }
-    .upload-header {
-        text-align: center;
-        padding: 10px;
-        background-color: #fffbf0;
-        border-radius: 10px;
+
+    /* Tema geral */
+    * {
+        font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    }
+
+    body {
+        background-color: #f5f7fa;
+    }
+
+    /* Sidebar */
+    [data-testid="stSidebar"] {
+        background: linear-gradient(135deg, #2c3e50 0%, #34495e 100%);
+    }
+
+    [data-testid="stSidebar"] [data-testid="stMarkdownContainer"] {
+        color: #ecf0f1;
+    }
+
+    /* Títulos */
+    h1 {
+        color: #2c3e50;
+        font-weight: 700;
+        letter-spacing: -0.5px;
+        margin-bottom: 5px;
+    }
+
+    h2 {
+        color: #2c3e50;
+        font-weight: 600;
+        border-bottom: 3px solid #3498db;
+        padding-bottom: 10px;
+        margin-top: 30px;
         margin-bottom: 20px;
-        border: 1px solid #ffeeba;
     }
+
+    h3 {
+        color: #34495e;
+        font-weight: 600;
+    }
+
+    /* Captions e textos auxiliares */
+    .stCaption {
+        color: #7f8c8d;
+        font-size: 14px;
+    }
+
+    /* Cards customizados */
+    .metric-card {
+        background: #ffffff;
+        border-radius: 12px;
+        padding: 20px;
+        border: 1px solid #e0e6ed;
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+        transition: all 0.3s ease;
+    }
+
+    .metric-card:hover {
+        box-shadow: 0 4px 16px rgba(0, 0, 0, 0.1);
+        transform: translateY(-2px);
+    }
+
+    .metric-card.primary {
+        background: linear-gradient(135deg, #3498db 0%, #2980b9 100%);
+        color: white;
+        border: none;
+    }
+
+    .metric-card.success {
+        background: linear-gradient(135deg, #27ae60 0%, #229954 100%);
+        color: white;
+        border: none;
+    }
+
+    .metric-card.warning {
+        background: linear-gradient(135deg, #f39c12 0%, #d68910 100%);
+        color: white;
+        border: none;
+    }
+
+    .metric-card.danger {
+        background: linear-gradient(135deg, #e74c3c 0%, #c0392b 100%);
+        color: white;
+        border: none;
+    }
+
+    .metric-card.light {
+        background: #f8f9fa;
+        border: 1px solid #dee2e6;
+    }
+
+    /* Upload area */
+    .upload-container {
+        background: linear-gradient(135deg, #ecf0f1 0%, #f5f7fa 100%);
+        border: 2px dashed #3498db;
+        border-radius: 12px;
+        padding: 30px;
+        text-align: center;
+        margin: 20px 0;
+    }
+
+    .upload-header {
+        color: #2c3e50;
+        font-size: 18px;
+        font-weight: 600;
+        margin-bottom: 10px;
+    }
+
+    .upload-subtitle {
+        color: #7f8c8d;
+        font-size: 14px;
+    }
+
+    /* Botões */
+    .stButton > button {
+        background-color: #3498db;
+        color: white;
+        border: none;
+        border-radius: 8px;
+        padding: 10px 24px;
+        font-weight: 600;
+        transition: all 0.3s ease;
+    }
+
+    .stButton > button:hover {
+        background-color: #2980b9;
+        box-shadow: 0 4px 12px rgba(52, 152, 219, 0.4);
+    }
+
+    /* Filtros */
+    .stMultiSelect, .stSelectbox, .stDateInput {
+        border-radius: 8px;
+    }
+
+    /* Tabela */
+    .stDataFrame {
+        border-radius: 8px;
+        overflow: hidden;
+    }
+
+    /* Info/Warning/Error boxes */
+    .stInfo {
+        background-color: #d1ecf1;
+        border-left: 4px solid #0c5460;
+        border-radius: 8px;
+    }
+
+    .stWarning {
+        background-color: #fff3cd;
+        border-left: 4px solid #856404;
+        border-radius: 8px;
+    }
+
+    .stSuccess {
+        background-color: #d4edda;
+        border-left: 4px solid #155724;
+        border-radius: 8px;
+    }
+
+    .stError {
+        background-color: #f8d7da;
+        border-left: 4px solid #721c24;
+        border-radius: 8px;
+    }
+
+    /* Dividers */
+    hr {
+        border: none;
+        height: 2px;
+        background: linear-gradient(90deg, transparent, #bdc3c7, transparent);
+        margin: 30px 0;
+    }
+
+    /* Sidebar header */
+    [data-testid="stSidebar"] h2 {
+        color: #ecf0f1;
+        border-bottom-color: #3498db;
+    }
+
+    [data-testid="stSidebar"] h3 {
+        color: #bdc3c7;
+    }
+
     </style>
     """, unsafe_allow_html=True)
 
 PT_MONTHS = {
-    "janeiro": 1,
-    "fevereiro": 2,
-    "março": 3,
-    "marco": 3,
-    "abril": 4,
-    "maio": 5,
-    "junho": 6,
-    "julho": 7,
-    "agosto": 8,
-    "setembro": 9,
-    "outubro": 10,
-    "novembro": 11,
-    "dezembro": 12,
+    "janeiro": 1, "fevereiro": 2, "março": 3, "marco": 3, "abril": 4,
+    "maio": 5, "junho": 6, "julho": 7, "agosto": 8, "setembro": 9,
+    "outubro": 10, "novembro": 11, "dezembro": 12,
 }
 
 EXPECTED_COLUMNS = [
-    "N.º de venda",
-    "Data da venda",
-    "Estado",
-    "Descrição do status",
-    "Receita por produtos (BRL)",
-    "Receita por envio (BRL)",
-    "Tarifa de venda e impostos (BRL)",
-    "Tarifas de envio (BRL)",
-    "Cancelamentos e reembolsos (BRL)",
-    "Total (BRL)",
+    "N.º de venda", "Data da venda", "Estado", "Descrição do status",
+    "Receita por produtos (BRL)", "Receita por envio (BRL)",
+    "Tarifa de venda e impostos (BRL)", "Tarifas de envio (BRL)",
+    "Cancelamentos e reembolsos (BRL)", "Total (BRL)",
 ]
 
 
@@ -73,93 +241,58 @@ def pct(value: float) -> str:
 
 
 def normalize_text(value) -> str:
-    if pd.isna(value):
-        return ""
-    return str(value).strip()
+    return "" if pd.isna(value) else str(value).strip()
 
 
 def parse_brazilian_datetime(value):
-    if pd.isna(value):
-        return pd.NaT
-    if isinstance(value, pd.Timestamp):
-        return value
-
+    if pd.isna(value) or isinstance(value, pd.Timestamp):
+        return value if isinstance(value, pd.Timestamp) else pd.NaT
     text = str(value).strip().replace(" hs.", "").replace(" hs", "")
     for fmt in ("%d/%m/%Y %H:%M", "%Y-%m-%d %H:%M:%S", "%d/%m/%Y"):
         try:
             return pd.to_datetime(datetime.strptime(text, fmt))
-        except Exception:
+        except:
             pass
-
     match = re.match(r"(\d{1,2}) de ([^ ]+) de (\d{4})(?: (\d{1,2}):(\d{2}))?$", text.lower())
     if match:
-        day = int(match.group(1))
-        month_name = match.group(2)
-        year = int(match.group(3))
-        hour = int(match.group(4) or 0)
-        minute = int(match.group(5) or 0)
-        month = PT_MONTHS.get(month_name)
+        month = PT_MONTHS.get(match.group(2))
         if month:
-            return pd.Timestamp(year=year, month=month, day=day, hour=hour, minute=minute)
+            return pd.Timestamp(year=int(match.group(3)), month=month, day=int(match.group(1)),
+                              hour=int(match.group(4) or 0), minute=int(match.group(5) or 0))
     return pd.NaT
 
 
 @st.cache_data(show_spinner=False)
 def load_excel(uploaded_file):
     xls = pd.ExcelFile(uploaded_file)
-    target_sheet = xls.sheet_names[0]
-    df = pd.read_excel(uploaded_file, sheet_name=target_sheet, header=5)
+    df = pd.read_excel(uploaded_file, sheet_name=xls.sheet_names[0], header=5)
     df.columns = [str(c).strip() for c in df.columns]
     return df
 
 
 def clean_dataframe(df: pd.DataFrame) -> pd.DataFrame:
     df = df.copy()
-
     for col in df.columns:
         if df[col].dtype == "object":
             df[col] = df[col].apply(normalize_text)
-
+    
     numeric_cols = [
-        "Receita por produtos (BRL)",
-        "Receita por acréscimo no preço (pago pelo comprador)",
-        "Taxa de parcelamento equivalente ao acréscimo",
-        "Tarifa de venda e impostos (BRL)",
-        "Receita por envio (BRL)",
-        "Tarifas de envio (BRL)",
-        "Cancelamentos e reembolsos (BRL)",
-        "Total (BRL)",
-        "Unidades",
-        "Preço unitário de venda do anúncio (BRL)",
+        "Receita por produtos (BRL)", "Receita por acréscimo no preço (pago pelo comprador)",
+        "Taxa de parcelamento equivalente ao acréscimo", "Tarifa de venda e impostos (BRL)",
+        "Receita por envio (BRL)", "Tarifas de envio (BRL)", "Cancelamentos e reembolsos (BRL)",
+        "Total (BRL)", "Unidades", "Preço unitário de venda do anúncio (BRL)",
     ]
     for col in numeric_cols:
         if col in df.columns:
             df[col] = pd.to_numeric(df[col], errors="coerce").fillna(0)
 
-    if "Data da venda" in df.columns:
-        df["data_venda_dt"] = df["Data da venda"].apply(parse_brazilian_datetime)
-    else:
-        df["data_venda_dt"] = pd.NaT
-
-    if "Estado" not in df.columns:
-        df["Estado"] = ""
-    if "Descrição do status" not in df.columns:
-        df["Descrição do status"] = ""
+    df["data_venda_dt"] = df["Data da venda"].apply(parse_brazilian_datetime) if "Data da venda" in df.columns else pd.NaT
+    df["Estado"] = df.get("Estado", "")
+    df["Descrição do status"] = df.get("Descrição do status", "")
 
     status_mix = (df["Estado"].fillna("") + " " + df["Descrição do status"].fillna("")).str.lower()
-
-    df["is_cancelled"] = status_mix.str.contains(
-        "cancel|reembolso|devolu|estornado|devolvido|devolvida|reembolsado|reembolsada",
-        regex=True,
-        na=False,
-    ) | (df.get("Cancelamentos e reembolsos (BRL)", 0).abs() > 0)
-
-    df["is_sent"] = status_mix.str.contains(
-        "entreg|a caminho|coleta|pronta para emitir|imprimir a etiqueta|envio|em trânsito|transito",
-        regex=True,
-    )
-
-    # Repasse base é o total reportado pelo Mercado Livre
+    df["is_cancelled"] = status_mix.str.contains("cancel|reembolso|devolu|estornado|devolvido|devolvida|reembolsado|reembolsada", regex=True, na=False) | (df.get("Cancelamentos e reembolsos (BRL)", 0).abs() > 0)
+    df["is_sent"] = status_mix.str.contains("entreg|a caminho|coleta|pronta para emitir|imprimir a etiqueta|envio|em trânsito|transito", regex=True)
     df["repasse_base"] = df.get("Total (BRL)", pd.Series(0, index=df.index)).fillna(0)
 
     return df
@@ -172,20 +305,10 @@ def compute_metrics(df: pd.DataFrame) -> dict:
     comissao = df.get("Tarifa de venda e impostos (BRL)", pd.Series(dtype=float)).abs().sum()
     frete_cobrado = df.get("Tarifas de envio (BRL)", pd.Series(dtype=float)).abs().sum()
     
-    pedidos_enviados = int(df["is_sent"].sum()) if "is_sent" in df.columns else 0
-
-    # Faturamento Líquido Base (sem benefícios)
-    # Agora inclui a Receita por Envio (BRL) paga pelo cliente no cálculo base
     faturamento_liquido = faturamento_total + frete_pago_cliente - cancelamentos - comissao - frete_cobrado
-
-    # Repasse Previsto (Total reportado para pedidos não cancelados)
-    # Representa o valor final que o ML paga (incluindo bônus/repaid)
     nao_cancelados = ~df.get("is_cancelled", pd.Series(False, index=df.index))
     repasse_previsto = df.loc[nao_cancelados, "repasse_base"].sum() if "repasse_base" in df.columns else 0
-
-    # Repaid / Benefícios: Diferença entre o Repasse Previsto e o Faturamento Líquido Base
     repaid_total = max(0, repasse_previsto - faturamento_liquido)
-    
     base_bruta_com_frete = faturamento_total + frete_pago_cliente
 
     return {
@@ -196,12 +319,10 @@ def compute_metrics(df: pd.DataFrame) -> dict:
         "frete_cobrado": float(frete_cobrado),
         "repaid_total": float(repaid_total),
         "faturamento_liquido": float(faturamento_liquido),
-        "pedidos_enviados": int(pedidos_enviados),
+        "pedidos_enviados": int(df["is_sent"].sum()) if "is_sent" in df.columns else 0,
         "repasse_previsto": float(repasse_previsto),
-        "repasse_previsto_pct": float(repasse_previsto / base_bruta_com_frete) if base_bruta_com_frete else 0,
         "cancel_pct": float(cancelamentos / faturamento_total) if faturamento_total else 0,
         "comissao_pct": float(comissao / faturamento_total) if faturamento_total else 0,
-        "repaid_pct": float(repaid_total / faturamento_total) if faturamento_total else 0,
         "base_bruta_com_frete": float(base_bruta_com_frete),
     }
 
@@ -218,15 +339,9 @@ def dataframe_for_download(df):
 
 
 def build_charts(metrics):
+    # Gráfico de Pizza - Composição
     composicao_df = pd.DataFrame({
-        "Categoria": [
-            "Faturamento líquido",
-            "Frete pago pelo cliente",
-            "Cancelado",
-            "Comissão",
-            "Frete cobrado",
-            "Repaid/Benefícios"
-        ],
+        "Categoria": ["Faturamento Líquido", "Frete Cliente", "Cancelamentos", "Comissão", "Frete Cobrado", "Repaid"],
         "Valor": [
             max(metrics["faturamento_liquido"], 0),
             metrics["frete_pago_cliente"],
@@ -236,10 +351,26 @@ def build_charts(metrics):
             metrics["repaid_total"]
         ],
     })
-    fig_donut = px.pie(composicao_df, names="Categoria", values="Valor", hole=0.55)
+    
+    fig_donut = go.Figure(data=[go.Pie(
+        labels=composicao_df["Categoria"],
+        values=composicao_df["Valor"],
+        hole=0.4,
+        marker=dict(colors=['#3498db', '#2ecc71', '#e74c3c', '#f39c12', '#9b59b6', '#1abc9c']),
+        textposition='inside',
+        textinfo='label+percent'
+    )])
+    fig_donut.update_layout(
+        font=dict(family="Segoe UI, sans-serif", size=12, color="#2c3e50"),
+        paper_bgcolor='rgba(0,0,0,0)',
+        plot_bgcolor='rgba(0,0,0,0)',
+        margin=dict(l=0, r=0, t=0, b=0),
+        height=400
+    )
 
+    # Gráfico de Barras - Comparativo
     comparativo_df = pd.DataFrame({
-        "Indicador": ["Faturamento total", "Base com frete do cliente", "Repasse previsto", "Faturamento líquido"],
+        "Indicador": ["Faturamento Total", "Base com Frete", "Repasse Previsto", "Faturamento Líquido"],
         "Valor": [
             metrics["faturamento_total"],
             metrics["base_bruta_com_frete"],
@@ -247,150 +378,93 @@ def build_charts(metrics):
             metrics["faturamento_liquido"],
         ],
     })
-    fig_bar = px.bar(comparativo_df, x="Indicador", y="Valor", text_auto=".2s")
+    
+    fig_bar = go.Figure(data=[go.Bar(
+        x=comparativo_df["Indicador"],
+        y=comparativo_df["Valor"],
+        marker=dict(color=['#3498db', '#2980b9', '#27ae60', '#2ecc71']),
+        text=[f'R$ {v/1000:.1f}k' for v in comparativo_df["Valor"]],
+        textposition='outside',
+    )])
+    fig_bar.update_layout(
+        font=dict(family="Segoe UI, sans-serif", size=12, color="#2c3e50"),
+        paper_bgcolor='rgba(0,0,0,0)',
+        plot_bgcolor='rgba(0,0,0,0)',
+        xaxis=dict(showgrid=False, zeroline=False),
+        yaxis=dict(showgrid=True, gridcolor='#ecf0f1', zeroline=False),
+        margin=dict(l=0, r=0, t=0, b=0),
+        height=400,
+        showlegend=False
+    )
+
     return fig_donut, fig_bar
 
 
-def render_metric_card(col, icon, title, value, description, bg_color="white"):
-    """Renderiza um card de métrica com estilo customizado"""
+def render_metric_card(col, icon, title, value, description, card_type="light"):
+    """Renderiza um card de métrica profissional"""
     with col:
         st.markdown(
             f"""
-            <div style="
-                background-color: {bg_color};
-                border-radius: 12px;
-                padding: 20px;
-                border: 1px solid #e0e0e0;
-                margin-bottom: 10px;
-                height: 160px;
-            ">
-                <div style="display: flex; align-items: center; margin-bottom: 12px;">
-                    <div style="
-                        font-size: 24px;
-                        width: 40px;
-                        height: 40px;
-                        display: flex;
-                        align-items: center;
-                        justify-content: center;
-                        background-color: rgba(255, 193, 7, 0.2);
-                        border-radius: 8px;
-                    ">
-                        {icon}
-                    </div>
+            <div class="metric-card {card_type}">
+                <div style="display: flex; align-items: flex-start; justify-content: space-between; margin-bottom: 15px;">
+                    <div style="font-size: 28px;">{icon}</div>
                 </div>
-                <div style="color: #666; font-size: 12px; margin-bottom: 8px;">
-                    {title}
-                </div>
-                <div style="color: #000; font-size: 22px; font-weight: bold; margin-bottom: 8px;">
-                    {value}
-                </div>
-                <div style="color: #999; font-size: 11px;">
-                    {description}
-                </div>
+                <div style="font-size: 13px; opacity: 0.8; margin-bottom: 8px; font-weight: 500;">{title}</div>
+                <div style="font-size: 28px; font-weight: 700; margin-bottom: 8px;">{value}</div>
+                <div style="font-size: 12px; opacity: 0.7;">{description}</div>
             </div>
             """,
             unsafe_allow_html=True
         )
 
 
-def render_indicator_card(col, icon, title, value, description):
-    """Renderiza um card de indicador"""
-    with col:
-        st.markdown(
-            f"""
-            <div style="
-                background-color: white;
-                border-radius: 12px;
-                padding: 20px;
-                border: 1px solid #e0e0e0;
-                margin-bottom: 10px;
-            ">
-                <div style="display: flex; align-items: center; gap: 12px;">
-                    <div style="
-                        font-size: 24px;
-                        width: 40px;
-                        height: 40px;
-                        display: flex;
-                        align-items: center;
-                        justify-content: center;
-                        background-color: rgba(255, 193, 7, 0.2);
-                        border-radius: 8px;
-                    ">
-                        {icon}
-                    </div>
-                    <div>
-                        <div style="color: #666; font-size: 12px;">
-                            {title}
-                        </div>
-                        <div style="color: #000; font-size: 20px; font-weight: bold;">
-                            {value}
-                        </div>
-                        <div style="color: #999; font-size: 11px;">
-                            {description}
-                        </div>
-                    </div>
-                </div>
-            </div>
-            """,
-            unsafe_allow_html=True
-        )
+# ========== HEADER ==========
+st.markdown("""
+    <div style="text-align: center; margin-bottom: 30px;">
+        <h1 style="margin: 0; font-size: 32px;">💰 Painel Financeiro Mercado Livre</h1>
+        <p style="color: #7f8c8d; margin-top: 5px; font-size: 16px;">Análise detalhada de vendas, custos e rentabilidade</p>
+    </div>
+    """, unsafe_allow_html=True)
 
-
-st.title("Painel Financeiro Mercado Livre")
-st.caption(
-    "Acompanhe faturamento, cancelamentos, comissões, fretes e repasse previsto com precisão."
-)
-
+# ========== SIDEBAR ==========
 with st.sidebar:
-    st.header("📊 Lógica de Cálculo")
+    st.markdown("### 📊 Lógica de Cálculo")
     st.markdown(
         """
-        Entenda como cada indicador é calculado com base no seu relatório:
-
         **1. Faturamento Total**  
         Soma da coluna `Receita por produtos (BRL)`.
 
         **2. Frete Pago pelo Cliente**  
-        Soma da coluna `Receita por envio (BRL)`. Valor pago pelo comprador que entra como receita.
+        Soma de `Receita por envio (BRL)`.
 
         **3. Vendas Canceladas**  
-        Soma absoluta da coluna `Cancelamentos e reembolsos (BRL)`.
+        Soma de `Cancelamentos e reembolsos (BRL)`.
 
         **4. Comissão Total**  
-        Soma absoluta da coluna `Tarifa de venda e impostos (BRL)`.
+        Soma de `Tarifa de venda e impostos (BRL)`.
 
         **5. Frete Cobrado Total**  
-        Soma absoluta da coluna `Tarifas de envio (BRL)`.
+        Soma de `Tarifas de envio (BRL)`.
 
         **6. Faturamento Líquido**  
-        `Faturamento` + `Frete Pago pelo Cliente` - `Cancelamentos` - `Comissão` - `Frete Cobrado`.  
-        *Representa o resultado real da sua operação.*
+        `Faturamento` + `Frete Cliente` - `Cancelamentos` - `Comissão` - `Frete Cobrado`.
 
         **7. Repasse Previsto**  
-        Soma da coluna `Total (BRL)` para pedidos não cancelados.  
-        *É o valor final reportado pelo Mercado Livre.*
+        Soma de `Total (BRL)` para pedidos não cancelados.
 
         **8. Repaid / Benefícios**  
-        `Repasse Previsto` - `Faturamento Líquido`.  
-        *Captura bônus extras de campanhas (ex: CPC) ou ajustes do ML.*
-
-        **9. % Cancelamento**  
-        `Cancelamentos` / `Faturamento Total`.
-
-        **10. Peso da Comissão**  
-        `Comissão` / `Faturamento Total`.
+        `Repasse Previsto` - `Faturamento Líquido`.
         """
     )
-    st.info(
-        "💡 **Dica:** O Repaid é identificado automaticamente sempre que o valor final do ML for maior que o cálculo base da venda."
-    )
+    st.divider()
+    st.info("💡 O Repaid captura automaticamente bônus de campanhas (CPC) ou ajustes do Mercado Livre.")
 
-# Área de Upload Melhorada
-st.markdown('<div class="upload-header"><h3>📤 Importar Relatório</h3><p>Arraste ou selecione o arquivo .xlsx exportado do Mercado Livre</p></div>', unsafe_allow_html=True)
+# ========== UPLOAD ==========
+st.markdown('<div class="upload-container"><div class="upload-header">📤 Importar Relatório</div><div class="upload-subtitle">Arraste ou selecione o arquivo .xlsx exportado do Mercado Livre</div></div>', unsafe_allow_html=True)
 uploaded_file = st.file_uploader("", type=["xlsx"], label_visibility="collapsed")
 
 if uploaded_file is None:
-    st.info("Aguardando upload da planilha para gerar o painel...")
+    st.info("👆 Aguardando upload da planilha para gerar o painel de análise...")
     st.stop()
 
 try:
@@ -399,149 +473,94 @@ try:
     df = clean_dataframe(raw_df)
     metrics = compute_metrics(df)
 except Exception as exc:
-    st.error("Não foi possível ler o arquivo. Verifique se ele está no padrão exportado pelo Mercado Livre.")
+    st.error("❌ Não foi possível ler o arquivo. Verifique se ele está no padrão exportado pelo Mercado Livre.")
     st.exception(exc)
     st.stop()
 
 if missing_cols:
-    st.warning("Algumas colunas esperadas não foram encontradas. O app tentou continuar com o que estava disponível.")
+    st.warning(f"⚠️ Colunas não encontradas: {', '.join(missing_cols)}")
 
-# ========== SEÇÃO DE CARDS PRINCIPAIS (8 CARDS) ==========
-st.markdown("---")
-
-# Primeira linha de cards (4 cards)
+# ========== SEÇÃO 1: RECEITAS ==========
+st.markdown("### 📈 Receitas")
 col1, col2, col3, col4 = st.columns(4, gap="small")
-render_metric_card(
-    col1, 
-    "💵", 
-    "Faturamento Total",
-    brl(metrics["faturamento_total"]),
-    "Receita total por produtos",
-    bg_color="#fffbf0"
-)
-render_metric_card(
-    col2,
-    "🚚",
-    "Frete Pago pelo Cliente",
-    brl(metrics["frete_pago_cliente"]),
-    "Receita por envio (pago pelo comprador)",
-    bg_color="white"
-)
-render_metric_card(
-    col3,
-    "❌",
-    "Vendas Canceladas",
-    brl(metrics["cancelamentos"]),
-    "Cancelamentos e reembolsos",
-    bg_color="white"
-)
-render_metric_card(
-    col4,
-    "%",
-    "Comissão Total",
-    brl(metrics["comissao"]),
-    "Tarifa de venda e impostos",
-    bg_color="#fffbf0"
-)
+render_metric_card(col1, "💵", "Faturamento Total", brl(metrics["faturamento_total"]), "Receita de produtos", "primary")
+render_metric_card(col2, "🚚", "Frete Pago pelo Cliente", brl(metrics["frete_pago_cliente"]), "Receita de envio", "success")
+render_metric_card(col3, "📊", "Base Bruta", brl(metrics["base_bruta_com_frete"]), "Total com frete", "light")
+render_metric_card(col4, "✅", "Faturamento Líquido", brl(metrics["faturamento_liquido"]), "Resultado operacional", "primary")
 
-# Segunda linha de cards (4 cards)
+# ========== SEÇÃO 2: CUSTOS ==========
+st.markdown("### 💸 Custos e Deduções")
 col5, col6, col7, col8 = st.columns(4, gap="small")
-render_metric_card(
-    col5,
-    "🚛",
-    "Frete Cobrado Total",
-    brl(metrics["frete_cobrado"]),
-    "Tarifas de envio descontadas",
-    bg_color="white"
-)
-render_metric_card(
-    col6,
-    "✅",
-    "Faturamento Líquido",
-    brl(metrics["faturamento_liquido"]),
-    "Faturamento + Frete Cliente - Taxas",
-    bg_color="#fffbf0"
-)
-render_metric_card(
-    col7,
-    "📦",
-    "Repasse Previsto",
-    brl(metrics["repasse_previsto"]),
-    "Valor previsto conforme relatório",
-    bg_color="#fffbf0"
-)
-render_metric_card(
-    col8,
-    "🎁",
-    "Repaid / Benefícios",
-    brl(metrics["repaid_total"]),
-    "Bônus de campanhas (CPC, etc)",
-    bg_color="#f0fff4"
-)
+render_metric_card(col5, "❌", "Vendas Canceladas", brl(metrics["cancelamentos"]), "Cancelamentos e reembolsos", "danger")
+render_metric_card(col6, "%", "Comissão Total", brl(metrics["comissao"]), "Tarifa de venda e impostos", "warning")
+render_metric_card(col7, "🚛", "Frete Cobrado", brl(metrics["frete_cobrado"]), "Tarifas de envio", "warning")
+render_metric_card(col8, "🎁", "Repaid / Benefícios", brl(metrics["repaid_total"]), "Bônus de campanhas", "success")
 
-# ========== SEÇÃO DE INDICADORES (2 CARDS) ==========
-st.markdown("---")
-st.subheader("Indicadores")
+# ========== SEÇÃO 3: RESULTADO FINAL ==========
+st.markdown("### 🎯 Resultado Final")
+col_result1, col_result2 = st.columns(2, gap="large")
+with col_result1:
+    render_metric_card(st.columns(1)[0], "📦", "Repasse Previsto", brl(metrics["repasse_previsto"]), "Valor final a receber", "primary")
+with col_result2:
+    render_metric_card(st.columns(1)[0], "📈", "Pedidos Enviados", str(metrics["pedidos_enviados"]), "Total de pedidos", "light")
 
-ind_col1, ind_col2 = st.columns(2, gap="medium")
-render_indicator_card(
-    ind_col1,
-    "📊",
-    "Percentual de Cancelamento",
-    pct(metrics["cancel_pct"]),
-    "sobre o faturamento total"
-)
-render_indicator_card(
-    ind_col2,
-    "%",
-    "Peso da Comissão",
-    pct(metrics["comissao_pct"]),
-    "sobre o faturamento total"
-)
+# ========== SEÇÃO 4: INDICADORES ==========
+st.markdown("### 📊 Indicadores de Performance")
+ind_col1, ind_col2 = st.columns(2, gap="large")
+with ind_col1:
+    render_metric_card(st.columns(1)[0], "📉", "% Cancelamento", pct(metrics["cancel_pct"]), "Sobre faturamento total", "light")
+with ind_col2:
+    render_metric_card(st.columns(1)[0], "%", "Peso da Comissão", pct(metrics["comissao_pct"]), "Sobre faturamento total", "light")
 
-st.markdown("---")
-
-st.caption(f"Base bruta considerada para conciliação: {brl(metrics['base_bruta_com_frete'])} = produtos + frete pago pelo cliente")
-
+# ========== GRÁFICOS ==========
+st.markdown("### 📉 Análise Visual")
 fig_donut, fig_bar = build_charts(metrics)
-
-chart_col1, chart_col2 = st.columns(2)
+chart_col1, chart_col2 = st.columns(2, gap="large")
 with chart_col1:
-    st.subheader("Composição financeira")
+    st.markdown("#### Composição Financeira")
     st.plotly_chart(fig_donut, use_container_width=True)
 with chart_col2:
-    st.subheader("Comparativo geral")
+    st.markdown("#### Comparativo de Valores")
     st.plotly_chart(fig_bar, use_container_width=True)
 
-st.subheader("Insights automáticos")
-insight_col1, insight_col2, insight_col3 = st.columns(3)
-insight_col1.success(f"Cancelamentos representam {pct(metrics['cancel_pct'])} do faturamento de produtos.")
-insight_col2.info(f"A comissão consome {pct(metrics['comissao_pct'])} do faturamento de produtos.")
-if metrics["repaid_total"] > 0:
-    insight_col3.success(f"Você recebeu {brl(metrics['repaid_total'])} em benefícios extras (Repaid).")
-else:
-    insight_col3.warning("Nenhum benefício extra (Repaid) detectado neste relatório.")
+# ========== INSIGHTS ==========
+st.markdown("### 💡 Insights Automáticos")
+insight_col1, insight_col2, insight_col3 = st.columns(3, gap="medium")
+with insight_col1:
+    st.success(f"✓ Cancelamentos: {pct(metrics['cancel_pct'])} do faturamento")
+with insight_col2:
+    st.info(f"ℹ Comissão: {pct(metrics['comissao_pct'])} do faturamento")
+with insight_col3:
+    if metrics["repaid_total"] > 0:
+        st.success(f"✓ Benefícios extras: {brl(metrics['repaid_total'])}")
+    else:
+        st.warning("⚠ Nenhum benefício extra detectado")
 
-st.subheader("Filtros")
-f1, f2, f3 = st.columns(3)
+# ========== FILTROS ==========
+st.markdown("### 🔍 Filtros e Análise Detalhada")
+f1, f2, f3 = st.columns(3, gap="medium")
 
-status_options = sorted([s for s in df["Estado"].dropna().unique().tolist() if str(s).strip()])
-selected_status = f1.multiselect("Filtrar por status", status_options)
+with f1:
+    status_options = sorted([s for s in df["Estado"].dropna().unique().tolist() if str(s).strip()])
+    selected_status = st.multiselect("Status", status_options, help="Filtrar por status de venda")
 
-canal_options = sorted([s for s in df.get("Canal de venda", pd.Series(dtype=str)).dropna().unique().tolist() if str(s).strip()])
-selected_canais = f2.multiselect("Filtrar por canal", canal_options)
+with f2:
+    canal_options = sorted([s for s in df.get("Canal de venda", pd.Series(dtype=str)).dropna().unique().tolist() if str(s).strip()])
+    selected_canais = st.multiselect("Canal de Venda", canal_options, help="Filtrar por canal")
+
+with f3:
+    if df["data_venda_dt"].notna().any():
+        min_date = df["data_venda_dt"].min().date()
+        max_date = df["data_venda_dt"].max().date()
+        selected_period = st.date_input("Período", value=(min_date, max_date), min_value=min_date, max_value=max_date)
+    else:
+        selected_period = None
 
 filtered_df = df.copy()
 
-if df["data_venda_dt"].notna().any():
-    min_date = df["data_venda_dt"].min().date()
-    max_date = df["data_venda_dt"].max().date()
-    selected_period = f3.date_input("Período", value=(min_date, max_date), min_value=min_date, max_value=max_date)
-    if isinstance(selected_period, tuple) and len(selected_period) == 2:
-        start_date, end_date = selected_period
-        filtered_df = filtered_df[
-            filtered_df["data_venda_dt"].dt.date.between(start_date, end_date, inclusive="both")
-        ]
+if selected_period and isinstance(selected_period, tuple) and len(selected_period) == 2:
+    start_date, end_date = selected_period
+    filtered_df = filtered_df[filtered_df["data_venda_dt"].dt.date.between(start_date, end_date, inclusive="both")]
 
 if selected_status:
     filtered_df = filtered_df[filtered_df["Estado"].isin(selected_status)]
@@ -549,36 +568,53 @@ if selected_status:
 if selected_canais and "Canal de venda" in filtered_df.columns:
     filtered_df = filtered_df[filtered_df["Canal de venda"].isin(selected_canais)]
 
-st.subheader("Tabela de pedidos")
+# ========== TABELA ==========
+st.markdown("### 📋 Detalhamento de Pedidos")
 download_df = dataframe_for_download(filtered_df)
 st.dataframe(download_df, use_container_width=True, height=420)
 
-csv_data = download_df.to_csv(index=False).encode("utf-8-sig")
-st.download_button(
-    "Baixar tabela filtrada em CSV",
-    data=csv_data,
-    file_name="pedidos_filtrados_mercado_livre.csv",
-    mime="text/csv",
-)
+# ========== DOWNLOADS ==========
+st.markdown("### 💾 Exportar Dados")
+col_csv, col_txt = st.columns(2, gap="medium")
 
-summary_text = f"""
-Painel Financeiro Mercado Livre
+with col_csv:
+    csv_data = download_df.to_csv(index=False).encode("utf-8-sig")
+    st.download_button(
+        "📥 Baixar CSV",
+        data=csv_data,
+        file_name="pedidos_filtrados_mercado_livre.csv",
+        mime="text/csv",
+    )
 
-Faturamento total: {brl(metrics['faturamento_total'])}
-Frete pago pelo cliente: {brl(metrics['frete_pago_cliente'])}
-Vendas canceladas: {brl(metrics['cancelamentos'])}
-Comissão total: {brl(metrics['comissao'])}
-Frete cobrado total: {brl(metrics['frete_cobrado'])}
-Faturamento líquido: {brl(metrics['faturamento_liquido'])}
-Repasse previsto: {brl(metrics['repasse_previsto'])}
-Percentual de cancelamento: {pct(metrics['cancel_pct'])}
-Peso da comissão: {pct(metrics['comissao_pct'])}
-Repaid / Benefícios: {brl(metrics['repaid_total'])}
-""".strip()
+with col_txt:
+    summary_text = f"""
+PAINEL FINANCEIRO MERCADO LIVRE
+{'='*50}
 
-st.download_button(
-    "Baixar resumo em TXT",
-    data=summary_text.encode("utf-8"),
-    file_name="resumo_financeiro_mercado_livre.txt",
-    mime="text/plain",
-)
+RECEITAS:
+  Faturamento Total: {brl(metrics['faturamento_total'])}
+  Frete Pago pelo Cliente: {brl(metrics['frete_pago_cliente'])}
+  Base Bruta: {brl(metrics['base_bruta_com_frete'])}
+
+CUSTOS:
+  Cancelamentos: {brl(metrics['cancelamentos'])}
+  Comissão: {brl(metrics['comissao'])}
+  Frete Cobrado: {brl(metrics['frete_cobrado'])}
+
+RESULTADO:
+  Faturamento Líquido: {brl(metrics['faturamento_liquido'])}
+  Repaid/Benefícios: {brl(metrics['repaid_total'])}
+  Repasse Previsto: {brl(metrics['repasse_previsto'])}
+
+INDICADORES:
+  % Cancelamento: {pct(metrics['cancel_pct'])}
+  Peso da Comissão: {pct(metrics['comissao_pct'])}
+  Pedidos Enviados: {metrics['pedidos_enviados']}
+    """.strip()
+    
+    st.download_button(
+        "📄 Baixar Resumo TXT",
+        data=summary_text.encode("utf-8"),
+        file_name="resumo_financeiro_mercado_livre.txt",
+        mime="text/plain",
+    )
