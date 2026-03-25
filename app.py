@@ -409,12 +409,13 @@ def build_charts(metrics):
     return fig_donut, fig_bar
 
 
-def render_metric_card(col, icon, title, value, description, card_type="light", percentage=None):
+def render_metric_card(col, icon, title, value, description, card_type="light", percentage=None, percentage_color=None):
     """Renderiza um card de métrica profissional com porcentagem opcional"""
     with col:
         percentage_html = ""
         if percentage is not None:
-            percentage_html = f'<div style="font-size: 14px; opacity: 0.6; margin-top: 6px; font-weight: 500;">{percentage}</div>'
+            color = percentage_color if percentage_color else "#7f8c8d"
+            percentage_html = f'<div style="font-size: 14px; color: {color}; margin-top: 6px; font-weight: 700;">{percentage}</div>'
         
         st.markdown(
             f"""
@@ -501,10 +502,10 @@ fat_total_pct = (metrics["faturamento_total"] / metrics["base_bruta_com_frete"] 
 frete_pct = (metrics["frete_pago_cliente"] / metrics["base_bruta_com_frete"] * 100) if metrics["base_bruta_com_frete"] > 0 else 0
 liquido_pct = (metrics["faturamento_liquido"] / metrics["base_bruta_com_frete"] * 100) if metrics["base_bruta_com_frete"] > 0 else 0
 
-render_metric_card(col1, "₹", "Faturamento Total", brl(metrics["faturamento_total"]), "Receita de produtos", "primary", f"{fat_total_pct:.1f}% da base bruta")
-render_metric_card(col2, "→", "Frete Pago pelo Cliente", brl(metrics["frete_pago_cliente"]), "Receita de envio", "success", f"{frete_pct:.1f}% da base bruta")
-render_metric_card(col3, "◆", "Base Bruta", brl(metrics["base_bruta_com_frete"]), "Total com frete", "light", "100% base")
-render_metric_card(col4, "✓", "Faturamento Líquido", brl(metrics["faturamento_liquido"]), "Resultado operacional", "primary", f"{liquido_pct:.1f}% da base bruta")
+render_metric_card(col1, "₹", "Faturamento Total", brl(metrics["faturamento_total"]), "Receita de produtos", "primary", f"{fat_total_pct:.1f}% da base bruta", "#27ae60")
+render_metric_card(col2, "→", "Frete Pago pelo Cliente", brl(metrics["frete_pago_cliente"]), "Receita de envio", "success", f"{frete_pct:.1f}% da base bruta", "#27ae60")
+render_metric_card(col3, "◆", "Base Bruta", brl(metrics["base_bruta_com_frete"]), "Total com frete", "light", "100% base", "#3498db")
+render_metric_card(col4, "✓", "Faturamento Líquido", brl(metrics["faturamento_liquido"]), "Resultado operacional", "primary", f"{liquido_pct:.1f}% da base bruta", "#27ae60")
 
 # ========== SEÇÃO 2: CUSTOS ==========
 st.markdown("### Custos e Deduções")
@@ -514,10 +515,10 @@ comissao_pct = (metrics["comissao"] / metrics["base_bruta_com_frete"] * 100) if 
 frete_cobrado_pct = (metrics["frete_cobrado"] / metrics["base_bruta_com_frete"] * 100) if metrics["base_bruta_com_frete"] > 0 else 0
 repaid_pct = (metrics["repaid_total"] / metrics["base_bruta_com_frete"] * 100) if metrics["base_bruta_com_frete"] > 0 else 0
 
-render_metric_card(col5, "✕", "Vendas Canceladas", brl(metrics["cancelamentos"]), "Cancelamentos e reembolsos", "danger", f"{cancel_pct:.1f}% da base bruta")
-render_metric_card(col6, "◆", "Comissão Total", brl(metrics["comissao"]), "Tarifa de venda e impostos", "warning", f"{comissao_pct:.1f}% da base bruta")
-render_metric_card(col7, "→", "Frete Cobrado", brl(metrics["frete_cobrado"]), "Tarifas de envio", "warning", f"{frete_cobrado_pct:.1f}% da base bruta")
-render_metric_card(col8, "⬆", "Repaid / Benefícios", brl(metrics["repaid_total"]), "Bônus de campanhas", "success", f"{repaid_pct:.1f}% da base bruta")
+render_metric_card(col5, "✕", "Vendas Canceladas", brl(metrics["cancelamentos"]), "Cancelamentos e reembolsos", "danger", f"{cancel_pct:.1f}% da base bruta", "#e74c3c")
+render_metric_card(col6, "◆", "Comissão Total", brl(metrics["comissao"]), "Tarifa de venda e impostos", "warning", f"{comissao_pct:.1f}% da base bruta", "#e74c3c")
+render_metric_card(col7, "→", "Frete Cobrado", brl(metrics["frete_cobrado"]), "Tarifas de envio", "warning", f"{frete_cobrado_pct:.1f}% da base bruta", "#e74c3c")
+render_metric_card(col8, "⬆", "Repaid / Benefícios", brl(metrics["repaid_total"]), "Bônus de campanhas", "success", f"{repaid_pct:.1f}% da base bruta", "#27ae60")
 
 # ========== SEÇÃO 3: RESULTADO FINAL ==========
 st.markdown("### Resultado Final")
@@ -525,7 +526,7 @@ col_result1, col_result2 = st.columns(2, gap="large")
 repasse_pct = (metrics["repasse_previsto"] / metrics["base_bruta_com_frete"] * 100) if metrics["base_bruta_com_frete"] > 0 else 0
 
 with col_result1:
-    render_metric_card(st.columns(1)[0], "◆", "Repasse Previsto", brl(metrics["repasse_previsto"]), "Valor final a receber", "primary", f"{repasse_pct:.1f}% da base bruta")
+    render_metric_card(st.columns(1)[0], "◆", "Repasse Previsto", brl(metrics["repasse_previsto"]), "Valor final a receber", "primary", f"{repasse_pct:.1f}% da base bruta", "#27ae60")
 with col_result2:
     render_metric_card(st.columns(1)[0], "↑", "Pedidos Enviados", str(metrics["pedidos_enviados"]), "Total de pedidos", "light")
 
