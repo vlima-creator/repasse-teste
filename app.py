@@ -231,6 +231,90 @@ def build_charts(metrics):
     return fig_donut, fig_bar
 
 
+def render_metric_card(col, icon, title, value, description, bg_color="white"):
+    """Renderiza um card de métrica com estilo customizado"""
+    with col:
+        st.markdown(
+            f"""
+            <div style="
+                background-color: {bg_color};
+                border-radius: 12px;
+                padding: 20px;
+                border: 1px solid #e0e0e0;
+                margin-bottom: 10px;
+            ">
+                <div style="display: flex; align-items: center; margin-bottom: 12px;">
+                    <div style="
+                        font-size: 24px;
+                        width: 40px;
+                        height: 40px;
+                        display: flex;
+                        align-items: center;
+                        justify-content: center;
+                        background-color: rgba(255, 193, 7, 0.2);
+                        border-radius: 8px;
+                    ">
+                        {icon}
+                    </div>
+                </div>
+                <div style="color: #666; font-size: 12px; margin-bottom: 8px;">
+                    {title}
+                </div>
+                <div style="color: #000; font-size: 24px; font-weight: bold; margin-bottom: 8px;">
+                    {value}
+                </div>
+                <div style="color: #999; font-size: 11px;">
+                    {description}
+                </div>
+            </div>
+            """,
+            unsafe_allow_html=True
+        )
+
+
+def render_indicator_card(col, icon, title, value, description):
+    """Renderiza um card de indicador"""
+    with col:
+        st.markdown(
+            f"""
+            <div style="
+                background-color: white;
+                border-radius: 12px;
+                padding: 20px;
+                border: 1px solid #e0e0e0;
+                margin-bottom: 10px;
+            ">
+                <div style="display: flex; align-items: center; gap: 12px;">
+                    <div style="
+                        font-size: 24px;
+                        width: 40px;
+                        height: 40px;
+                        display: flex;
+                        align-items: center;
+                        justify-content: center;
+                        background-color: rgba(255, 193, 7, 0.2);
+                        border-radius: 8px;
+                    ">
+                        {icon}
+                    </div>
+                    <div>
+                        <div style="color: #666; font-size: 12px;">
+                            {title}
+                        </div>
+                        <div style="color: #000; font-size: 20px; font-weight: bold;">
+                            {value}
+                        </div>
+                        <div style="color: #999; font-size: 11px;">
+                            {description}
+                        </div>
+                    </div>
+                </div>
+            </div>
+            """,
+            unsafe_allow_html=True
+        )
+
+
 st.title("Painel Financeiro Mercado Livre")
 st.caption(
     "Faça upload do relatório de vendas do Mercado Livre em Excel e acompanhe faturamento, cancelamentos, comissões, fretes e repasse previsto."
@@ -286,18 +370,84 @@ except Exception as exc:
 if missing_cols:
     st.warning("Algumas colunas esperadas não foram encontradas. O app tentou continuar com o que estava disponível.")
 
-top1, top2, top3, top4, top5 = st.columns(5)
-top1.metric("Faturamento total", brl(metrics["faturamento_total"]))
-top2.metric("Frete pago pelo cliente", brl(metrics["frete_pago_cliente"]), pct(metrics["frete_pago_cliente_pct"]))
-top3.metric("Vendas canceladas", brl(metrics["cancelamentos"]))
-top4.metric("Comissão total", brl(metrics["comissao"]))
-top5.metric("Frete cobrado total", brl(metrics["frete_cobrado"]))
+# ========== SEÇÃO DE CARDS PRINCIPAIS ==========
+st.markdown("---")
 
-mid1, mid2, mid3, mid4 = st.columns(4)
-mid1.metric("Faturamento líquido", brl(metrics["faturamento_liquido"]))
-mid2.metric("Repasse previsto", brl(metrics["repasse_previsto"]), pct(metrics["repasse_previsto_pct"]))
-mid3.metric("Percentual de cancelamento", pct(metrics["cancel_pct"]))
-mid4.metric("Peso da comissão", pct(metrics["comissao_pct"]))
+# Primeira linha de cards
+col1, col2, col3 = st.columns(3, gap="medium")
+render_metric_card(
+    col1, 
+    "💵", 
+    "Faturamento Total",
+    brl(metrics["faturamento_total"]),
+    "Receita total por produtos",
+    bg_color="#fffbf0"
+)
+render_metric_card(
+    col2,
+    "❌",
+    "Vendas Canceladas",
+    brl(metrics["cancelamentos"]),
+    "Cancelamentos e reembolsos",
+    bg_color="white"
+)
+render_metric_card(
+    col3,
+    "%",
+    "Comissão Total",
+    brl(metrics["comissao"]),
+    "Tarifa de venda e impostos",
+    bg_color="#fffbf0"
+)
+
+# Segunda linha de cards
+col4, col5, col6 = st.columns(3, gap="medium")
+render_metric_card(
+    col4,
+    "🚚",
+    "Frete Cobrado Total",
+    brl(metrics["frete_cobrado"]),
+    "Tarifas de envio descontadas",
+    bg_color="white"
+)
+render_metric_card(
+    col5,
+    "✅",
+    "Faturamento Líquido",
+    brl(metrics["faturamento_liquido"]),
+    "Faturamento - cancelamentos - frete - comissão",
+    bg_color="#fffbf0"
+)
+render_metric_card(
+    col6,
+    "📦",
+    "Repasse Previsto",
+    brl(metrics["repasse_previsto"]),
+    "Valor previsto conforme relatório",
+    bg_color="#fffbf0"
+)
+
+# ========== SEÇÃO DE INDICADORES ==========
+st.markdown("---")
+st.subheader("Indicadores")
+
+ind_col1, ind_col2 = st.columns(2, gap="medium")
+render_indicator_card(
+    ind_col1,
+    "📊",
+    "% Cancelamento",
+    pct(metrics["cancel_pct"]),
+    "sobre o faturamento total"
+)
+render_indicator_card(
+    ind_col2,
+    "%",
+    "Peso da Comissão",
+    pct(metrics["comissao_pct"]),
+    "sobre o faturamento total"
+)
+
+st.markdown("---")
 
 st.caption(f"Base bruta considerada para conciliação: {brl(metrics['base_bruta_com_frete'])} = produtos + frete pago pelo cliente")
 
