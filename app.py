@@ -153,7 +153,8 @@ def clean_dataframe(df: pd.DataFrame) -> pd.DataFrame:
     df["calculo_base"] = receita_produtos + receita_acrescimo - taxa_parcelamento + comissao + tarifas_envio + cancelamentos
     
     # O Repaid é a diferença positiva entre o que o ML reportou e o nosso cálculo base
-    df["repaid_beneficio"] = (total_reportado - df["calculo_base"]).clip(lower=0)
+    # Ajuste: arredondar para evitar erros de precisão de ponto flutuante
+    df["repaid_beneficio"] = (total_reportado - df["calculo_base"]).round(2).clip(lower=0)
     
     # Repasse base é o total reportado
     df["repasse_base"] = total_reportado
@@ -172,7 +173,8 @@ def compute_metrics(df: pd.DataFrame) -> dict:
     pedidos_enviados = int(df["is_sent"].sum()) if "is_sent" in df.columns else 0
 
     # Faturamento líquido agora inclui o benefício/repaid
-    faturamento_liquido = faturamento_total + frete_pago_cliente - cancelamentos - comissao - frete_cobrado + repaid_total
+    # Lógica: Faturamento Total - Taxas + Repaid
+    faturamento_liquido = faturamento_total - cancelamentos - comissao - frete_cobrado + repaid_total
 
     nao_cancelados = ~df.get("is_cancelled", pd.Series(False, index=df.index))
     repasse_previsto = df.loc[nao_cancelados, "repasse_base"].sum() if "repasse_base" in df.columns else 0
