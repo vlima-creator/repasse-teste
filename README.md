@@ -1,16 +1,24 @@
 # Painel de Repasse Mercado Livre
 
-Aplicativo em Streamlit para leitura do relatório de vendas do Mercado Livre e geração de indicadores operacionais de repasse.
+Aplicativo em Streamlit para leitura do relatório de vendas do Mercado Livre e geração de indicadores financeiros e operacionais.
 
 ## O que o app mostra
 - Faturamento total gerado das vendas
 - Vendas canceladas ou reembolsadas
 - Comissão total descontada
-- Pedidos enviados
-- Previsão estimada de repasse até 7 dias
-- Previsão estimada de repasse após 7 dias
-- Percentuais sobre o faturamento total
+- Frete cobrado total
+- Faturamento líquido
+- Repasse previsto
+- Percentual de cancelamento
+- Peso da comissão
 - Tabela de pedidos com filtros
+
+## Regras principais
+- Faturamento total: soma de `Receita por produtos (BRL)`
+- Faturamento líquido: `Receita por produtos + Receita por envio - cancelamentos - comissão - tarifas de envio`
+- Repasse previsto: usa `Total (BRL)` para pedidos não cancelados
+- Quando `Total (BRL)` vier vazio ou zerado, o app reconstrói o repasse com base nas colunas financeiras do relatório
+- Quando existir `Receita por envio (BRL)`, esse valor entra no cálculo, pois impacta o valor final recebido
 
 ## Como rodar localmente
 ```bash
@@ -31,4 +39,4 @@ streamlit run app.py
 - `README.md`: instruções
 
 ## Observação
-A previsão de repasse é estimada, não financeira oficial. Para conciliação exata, cruze com extrato do Mercado Pago ou relatório financeiro do Mercado Livre.
+O repasse previsto é estimado com base no relatório de vendas. Para conciliação financeira oficial, cruze com extrato do Mercado Pago ou relatório financeiro do Mercado Livre.
