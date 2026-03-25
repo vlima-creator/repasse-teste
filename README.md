@@ -1,42 +1,29 @@
-# Painel de Repasse Mercado Livre
+# Painel Financeiro Mercado Livre
 
-Aplicativo em Streamlit para leitura do relatório de vendas do Mercado Livre e geração de indicadores financeiros e operacionais.
+Aplicativo em Streamlit para leitura do relatório de vendas do Mercado Livre e consolidação dos principais indicadores financeiros.
 
-## O que o app mostra
-- Faturamento total gerado das vendas
-- Vendas canceladas ou reembolsadas
-- Comissão total descontada
+## Indicadores do painel
+- Faturamento total
+- Frete pago pelo cliente
+- Vendas canceladas
+- Comissão total
 - Frete cobrado total
 - Faturamento líquido
 - Repasse previsto
 - Percentual de cancelamento
 - Peso da comissão
-- Tabela de pedidos com filtros
 
-## Regras principais
-- Faturamento total: soma de `Receita por produtos (BRL)`
-- Faturamento líquido: `Receita por produtos + Receita por envio - cancelamentos - comissão - tarifas de envio`
-- Repasse previsto: usa `Total (BRL)` para pedidos não cancelados
-- Quando `Total (BRL)` vier vazio ou zerado, o app reconstrói o repasse com base nas colunas financeiras do relatório
-- Quando existir `Receita por envio (BRL)`, esse valor entra no cálculo, pois impacta o valor final recebido
+## Lógica principal
+- **Faturamento total**: soma de `Receita por produtos (BRL)`
+- **Frete pago pelo cliente**: soma de `Receita por envio (BRL)`
+- **Vendas canceladas**: soma absoluta de `Cancelamentos e reembolsos (BRL)` e apoio de leitura do status
+- **Comissão total**: soma absoluta de `Tarifa de venda e impostos (BRL)`
+- **Frete cobrado total**: soma absoluta de `Tarifas de envio (BRL)`
+- **Faturamento líquido**: produtos + frete pago pelo cliente - cancelamentos - comissão - frete cobrado
+- **Repasse previsto**: usa `Total (BRL)` dos pedidos não cancelados. Se essa coluna vier vazia ou zerada, o app reconstrói o valor usando a lógica financeira do relatório
 
-## Como rodar localmente
+## Como rodar
 ```bash
 pip install -r requirements.txt
 streamlit run app.py
 ```
-
-## Como subir no GitHub e Streamlit Community Cloud
-1. Crie um repositório no GitHub.
-2. Envie os arquivos deste projeto.
-3. No Streamlit Community Cloud, conecte o repositório.
-4. Defina `app.py` como arquivo principal.
-5. Publique.
-
-## Estrutura
-- `app.py`: app principal
-- `requirements.txt`: dependências
-- `README.md`: instruções
-
-## Observação
-O repasse previsto é estimado com base no relatório de vendas. Para conciliação financeira oficial, cruze com extrato do Mercado Pago ou relatório financeiro do Mercado Livre.

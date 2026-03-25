@@ -1,3 +1,4 @@
+
 import pandas as pd
 import plotly.express as px
 import streamlit as st
@@ -47,17 +48,14 @@ def brl(value: float) -> str:
         return "R$ 0,00"
 
 
-
 def pct(value: float) -> str:
     return f"{value:.1%}".replace(".", ",")
-
 
 
 def normalize_text(value) -> str:
     if pd.isna(value):
         return ""
     return str(value).strip()
-
 
 
 def parse_brazilian_datetime(value):
@@ -93,7 +91,6 @@ def load_excel(uploaded_file):
     df = pd.read_excel(uploaded_file, sheet_name=target_sheet, header=5)
     df.columns = [str(c).strip() for c in df.columns]
     return df
-
 
 
 def clean_dataframe(df: pd.DataFrame) -> pd.DataFrame:
@@ -144,12 +141,12 @@ def clean_dataframe(df: pd.DataFrame) -> pd.DataFrame:
 
     receita_produtos = df.get("Receita por produtos (BRL)", pd.Series(0, index=df.index)).fillna(0)
     receita_envio = df.get("Receita por envio (BRL)", pd.Series(0, index=df.index)).fillna(0)
-    comissao = df.get("Tarifa de venda e impostos (BRL)", pd.Series(0, index=df.index)).fillna(0)
-    tarifas_envio = df.get("Tarifas de envio (BRL)", pd.Series(0, index=df.index)).fillna(0)
-    cancelamentos = df.get("Cancelamentos e reembolsos (BRL)", pd.Series(0, index=df.index)).fillna(0)
+    comissao = df.get("Tarifa de venda e impostos (BRL)", pd.Series(0, index=df.index)).fillna(0).abs()
+    tarifas_envio = df.get("Tarifas de envio (BRL)", pd.Series(0, index=df.index)).fillna(0).abs()
+    cancelamentos = df.get("Cancelamentos e reembolsos (BRL)", pd.Series(0, index=df.index)).fillna(0).abs()
 
     total_reportado = df.get("Total (BRL)", pd.Series(0, index=df.index)).fillna(0)
-    total_reconstruido = receita_produtos + receita_envio + comissao + tarifas_envio + cancelamentos
+    total_reconstruido = receita_produtos + receita_envio - comissao - tarifas_envio - cancelamentos
     usar_total_reconstruido = total_reportado.eq(0) & (
         receita_produtos.ne(0) | receita_envio.ne(0) | comissao.ne(0) | tarifas_envio.ne(0) | cancelamentos.ne(0)
     )
@@ -158,36 +155,37 @@ def clean_dataframe(df: pd.DataFrame) -> pd.DataFrame:
     return df
 
 
-
 def compute_metrics(df: pd.DataFrame) -> dict:
     faturamento_total = df.get("Receita por produtos (BRL)", pd.Series(dtype=float)).sum()
-    receita_envio = df.get("Receita por envio (BRL)", pd.Series(dtype=float)).sum()
+    frete_pago_cliente = df.get("Receita por envio (BRL)", pd.Series(dtype=float)).sum()
     cancelamentos = df.get("Cancelamentos e reembolsos (BRL)", pd.Series(dtype=float)).abs().sum()
     comissao = df.get("Tarifa de venda e impostos (BRL)", pd.Series(dtype=float)).abs().sum()
     frete_cobrado = df.get("Tarifas de envio (BRL)", pd.Series(dtype=float)).abs().sum()
     pedidos_enviados = int(df["is_sent"].sum()) if "is_sent" in df.columns else 0
 
-    faturamento_liquido = faturamento_total + receita_envio - cancelamentos - comissao - frete_cobrado
-    faturamento_liquido = float(faturamento_liquido)
+    faturamento_liquido = faturamento_total + frete_pago_cliente - cancelamentos - comissao - frete_cobrado
 
     nao_cancelados = ~df.get("is_cancelled", pd.Series(False, index=df.index))
     repasse_previsto = df.loc[nao_cancelados, "repasse_base"].clip(lower=0).sum() if "repasse_base" in df.columns else 0
 
+    base_bruta_com_frete = faturamento_total + frete_pago_cliente
+
     return {
         "faturamento_total": float(faturamento_total),
-        "receita_envio": float(receita_envio),
+        "frete_pago_cliente": float(frete_pago_cliente),
         "cancelamentos": float(cancelamentos),
         "comissao": float(comissao),
         "frete_cobrado": float(frete_cobrado),
         "faturamento_liquido": float(faturamento_liquido),
         "pedidos_enviados": int(pedidos_enviados),
         "repasse_previsto": float(repasse_previsto),
-        "repasse_previsto_pct": float(repasse_previsto / faturamento_total) if faturamento_total else 0,
+        "repasse_previsto_pct": float(repasse_previsto / base_bruta_com_frete) if base_bruta_com_frete else 0,
         "cancel_pct": float(cancelamentos / faturamento_total) if faturamento_total else 0,
         "comissao_pct": float(comissao / faturamento_total) if faturamento_total else 0,
-        "frete_pct": float(frete_cobrado / faturamento_total) if faturamento_total else 0,
+        "frete_cobrado_pct": float(frete_cobrado / faturamento_total) if faturamento_total else 0,
+        "frete_pago_cliente_pct": float(frete_pago_cliente / base_bruta_com_frete) if base_bruta_com_frete else 0,
+        "base_bruta_com_frete": float(base_bruta_com_frete),
     }
-
 
 
 def dataframe_for_download(df):
@@ -201,12 +199,18 @@ def dataframe_for_download(df):
     return df[export_cols].copy()
 
 
-
 def build_charts(metrics):
     composicao_df = pd.DataFrame({
-        "Categoria": ["Faturamento líquido", "Cancelado", "Comissão", "Frete cobrado"],
+        "Categoria": [
+            "Faturamento líquido",
+            "Frete pago pelo cliente",
+            "Cancelado",
+            "Comissão",
+            "Frete cobrado",
+        ],
         "Valor": [
             max(metrics["faturamento_liquido"], 0),
+            metrics["frete_pago_cliente"],
             metrics["cancelamentos"],
             metrics["comissao"],
             metrics["frete_cobrado"],
@@ -215,9 +219,10 @@ def build_charts(metrics):
     fig_donut = px.pie(composicao_df, names="Categoria", values="Valor", hole=0.55)
 
     comparativo_df = pd.DataFrame({
-        "Indicador": ["Faturamento total", "Repasse previsto", "Faturamento líquido"],
+        "Indicador": ["Faturamento total", "Base com frete do cliente", "Repasse previsto", "Faturamento líquido"],
         "Valor": [
             metrics["faturamento_total"],
+            metrics["base_bruta_com_frete"],
             metrics["repasse_previsto"],
             metrics["faturamento_liquido"],
         ],
@@ -228,7 +233,7 @@ def build_charts(metrics):
 
 st.title("Painel Financeiro Mercado Livre")
 st.caption(
-    "Faça upload do relatório de vendas do Mercado Livre em Excel e veja os indicadores principais de faturamento, cancelamento, comissão, frete e repasse previsto."
+    "Faça upload do relatório de vendas do Mercado Livre em Excel e acompanhe faturamento, cancelamentos, comissões, fretes e repasse previsto."
 )
 
 with st.sidebar:
@@ -237,6 +242,9 @@ with st.sidebar:
         """
         **Faturamento total**  
         Soma da coluna `Receita por produtos (BRL)`.
+
+        **Frete pago pelo cliente**  
+        Soma da coluna `Receita por envio (BRL)`. Esse valor entra como receita adicional quando o comprador paga o frete.
 
         **Vendas canceladas**  
         Soma absoluta da coluna `Cancelamentos e reembolsos (BRL)` e leitura do status.
@@ -248,10 +256,11 @@ with st.sidebar:
         Soma absoluta da coluna `Tarifas de envio (BRL)`.
 
         **Faturamento líquido**  
-        Faturamento total + `Receita por envio (BRL)` - cancelamentos - comissão - frete cobrado.
+        `Receita por produtos` + `Receita por envio` - cancelamentos - comissão - frete cobrado.
 
         **Repasse previsto**  
-        Soma do `Total (BRL)` para pedidos sem sinal de cancelamento ou reembolso. Quando o `Total (BRL)` vier vazio ou zerado, o app reconstrói o valor usando produto + receita por envio - comissão - frete - cancelamentos.
+        Soma do `Total (BRL)` para pedidos sem sinal de cancelamento ou reembolso. Quando o `Total (BRL)` vier vazio ou zerado, o app reconstrói o valor com a lógica:
+        `Receita por produtos` + `Receita por envio` - `Comissão` - `Frete cobrado` - `Cancelamentos`.
         """
     )
     st.warning(
@@ -277,19 +286,20 @@ except Exception as exc:
 if missing_cols:
     st.warning("Algumas colunas esperadas não foram encontradas. O app tentou continuar com o que estava disponível.")
 
-col1, col2, col3, col4, col5 = st.columns(5)
-col1.metric("Faturamento total", brl(metrics["faturamento_total"]))
-col2.metric("Vendas canceladas", brl(metrics["cancelamentos"]))
-col3.metric("Comissão total", brl(metrics["comissao"]))
-col4.metric("Frete cobrado total", brl(metrics["frete_cobrado"]))
-col5.metric("Faturamento líquido", brl(metrics["faturamento_liquido"]))
+top1, top2, top3, top4, top5 = st.columns(5)
+top1.metric("Faturamento total", brl(metrics["faturamento_total"]))
+top2.metric("Frete pago pelo cliente", brl(metrics["frete_pago_cliente"]), pct(metrics["frete_pago_cliente_pct"]))
+top3.metric("Vendas canceladas", brl(metrics["cancelamentos"]))
+top4.metric("Comissão total", brl(metrics["comissao"]))
+top5.metric("Frete cobrado total", brl(metrics["frete_cobrado"]))
 
-col6, col7, col8 = st.columns(3)
-col6.metric("Repasse previsto", brl(metrics["repasse_previsto"]), pct(metrics["repasse_previsto_pct"]))
-col7.metric("Percentual de cancelamento", pct(metrics["cancel_pct"]))
-col8.metric("Peso da comissão", pct(metrics["comissao_pct"]))
+mid1, mid2, mid3, mid4 = st.columns(4)
+mid1.metric("Faturamento líquido", brl(metrics["faturamento_liquido"]))
+mid2.metric("Repasse previsto", brl(metrics["repasse_previsto"]), pct(metrics["repasse_previsto_pct"]))
+mid3.metric("Percentual de cancelamento", pct(metrics["cancel_pct"]))
+mid4.metric("Peso da comissão", pct(metrics["comissao_pct"]))
 
-st.caption(f"Receita por envio considerada nos cálculos: {brl(metrics['receita_envio'])}")
+st.caption(f"Base bruta considerada para conciliação: {brl(metrics['base_bruta_com_frete'])} = produtos + frete pago pelo cliente")
 
 fig_donut, fig_bar = build_charts(metrics)
 
@@ -303,10 +313,10 @@ with chart_col2:
 
 st.subheader("Insights automáticos")
 insight_col1, insight_col2, insight_col3 = st.columns(3)
-insight_col1.success(f"Cancelamentos representam {pct(metrics['cancel_pct'])} do faturamento bruto.")
-insight_col2.info(f"A comissão consome {pct(metrics['comissao_pct'])} do faturamento bruto.")
+insight_col1.success(f"Cancelamentos representam {pct(metrics['cancel_pct'])} do faturamento de produtos.")
+insight_col2.info(f"A comissão consome {pct(metrics['comissao_pct'])} do faturamento de produtos.")
 insight_col3.warning(
-    f"O repasse previsto considera {brl(metrics['receita_envio'])} de receita por envio quando houver cobrança de frete ao comprador."
+    f"O cliente pagou {brl(metrics['frete_pago_cliente'])} em frete, equivalente a {pct(metrics['frete_pago_cliente_pct'])} da base bruta considerada."
 )
 
 st.subheader("Filtros")
@@ -318,38 +328,32 @@ selected_status = f1.multiselect("Filtrar por status", status_options)
 canal_options = sorted([s for s in df.get("Canal de venda", pd.Series(dtype=str)).dropna().unique().tolist() if str(s).strip()])
 selected_canais = f2.multiselect("Filtrar por canal", canal_options)
 
+filtered_df = df.copy()
+
 if df["data_venda_dt"].notna().any():
     min_date = df["data_venda_dt"].min().date()
     max_date = df["data_venda_dt"].max().date()
-    selected_period = f3.date_input("Período da venda", value=(min_date, max_date))
-else:
-    selected_period = None
-    f3.info("Sem datas válidas para filtrar.")
+    selected_period = f3.date_input("Período", value=(min_date, max_date), min_value=min_date, max_value=max_date)
+    if isinstance(selected_period, tuple) and len(selected_period) == 2:
+        start_date, end_date = selected_period
+        filtered_df = filtered_df[
+            filtered_df["data_venda_dt"].dt.date.between(start_date, end_date, inclusive="both")
+        ]
 
-filtered_df = df.copy()
 if selected_status:
     filtered_df = filtered_df[filtered_df["Estado"].isin(selected_status)]
-if selected_canais:
+
+if selected_canais and "Canal de venda" in filtered_df.columns:
     filtered_df = filtered_df[filtered_df["Canal de venda"].isin(selected_canais)]
-if isinstance(selected_period, tuple) and len(selected_period) == 2 and df["data_venda_dt"].notna().any():
-    start_dt = pd.Timestamp(selected_period[0])
-    end_dt = pd.Timestamp(selected_period[1]) + pd.Timedelta(days=1) - pd.Timedelta(seconds=1)
-    filtered_df = filtered_df[filtered_df["data_venda_dt"].between(start_dt, end_dt, inclusive="both")]
 
 st.subheader("Tabela de pedidos")
-display_cols = [c for c in [
-    "N.º de venda", "Data da venda", "Estado", "Descrição do status", "Título do anúncio",
-    "Canal de venda", "Forma de entrega", "Receita por produtos (BRL)",
-    "Receita por envio (BRL)", "Cancelamentos e reembolsos (BRL)",
-    "Tarifa de venda e impostos (BRL)", "Tarifas de envio (BRL)",
-    "Total (BRL)", "repasse_base"
-] if c in filtered_df.columns]
-st.dataframe(filtered_df[display_cols], use_container_width=True, hide_index=True)
+download_df = dataframe_for_download(filtered_df)
+st.dataframe(download_df, use_container_width=True, height=420)
 
-csv_bytes = dataframe_for_download(filtered_df).to_csv(index=False).encode("utf-8-sig")
+csv_data = download_df.to_csv(index=False).encode("utf-8-sig")
 st.download_button(
-    label="Baixar tabela filtrada em CSV",
-    data=csv_bytes,
+    "Baixar tabela filtrada em CSV",
+    data=csv_data,
     file_name="pedidos_filtrados_mercado_livre.csv",
     mime="text/csv",
 )
@@ -357,23 +361,20 @@ st.download_button(
 summary_text = f"""
 Painel Financeiro Mercado Livre
 
-Faturamento total: {brl(metrics["faturamento_total"])}
-Receita por envio considerada: {brl(metrics["receita_envio"])}
-Vendas canceladas: {brl(metrics["cancelamentos"])}
-Comissão total: {brl(metrics["comissao"])}
-Frete cobrado total: {brl(metrics["frete_cobrado"])}
-Faturamento líquido: {brl(metrics["faturamento_liquido"])}
-Repasse previsto: {brl(metrics["repasse_previsto"])} ({pct(metrics["repasse_previsto_pct"])})
-Percentual de cancelamento: {pct(metrics["cancel_pct"])}
-Peso da comissão: {pct(metrics["comissao_pct"])}
+Faturamento total: {brl(metrics['faturamento_total'])}
+Frete pago pelo cliente: {brl(metrics['frete_pago_cliente'])}
+Vendas canceladas: {brl(metrics['cancelamentos'])}
+Comissão total: {brl(metrics['comissao'])}
+Frete cobrado total: {brl(metrics['frete_cobrado'])}
+Faturamento líquido: {brl(metrics['faturamento_liquido'])}
+Repasse previsto: {brl(metrics['repasse_previsto'])}
+Percentual de cancelamento: {pct(metrics['cancel_pct'])}
+Peso da comissão: {pct(metrics['comissao_pct'])}
+""".strip()
 
-Aviso:
-O repasse previsto é uma estimativa feita com base nas informações disponíveis no relatório de vendas.
-Quando existir `Receita por envio (BRL)`, esse valor também é considerado nos cálculos.
-"""
 st.download_button(
-    label="Baixar resumo em TXT",
+    "Baixar resumo em TXT",
     data=summary_text.encode("utf-8"),
-    file_name="resumo_painel_financeiro.txt",
+    file_name="resumo_financeiro_mercado_livre.txt",
     mime="text/plain",
 )
