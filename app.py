@@ -76,48 +76,57 @@ st.markdown("""
         font-size: 14px;
     }
 
-    /* Cards customizados */
+    /* Cards customizados - Liquid Glass Style */
     .metric-card {
-        background: #ffffff;
+        background: rgba(255, 255, 255, 0.85);
+        backdrop-filter: blur(10px);
         border-radius: 12px;
         padding: 20px;
-        border: 1px solid #e0e6ed;
-        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+        border-left: 4px solid #95a5a6;
+        border: 1px solid rgba(255, 255, 255, 0.5);
+        box-shadow: 0 8px 32px rgba(0, 0, 0, 0.08);
         transition: all 0.3s ease;
     }
 
     .metric-card:hover {
-        box-shadow: 0 4px 16px rgba(0, 0, 0, 0.1);
+        box-shadow: 0 12px 40px rgba(0, 0, 0, 0.12);
         transform: translateY(-2px);
+        background: rgba(255, 255, 255, 0.95);
     }
 
     .metric-card.primary {
-        background: linear-gradient(135deg, #3498db 0%, #2980b9 100%);
-        color: white;
-        border: none;
+        background: rgba(255, 255, 255, 0.85);
+        backdrop-filter: blur(10px);
+        border-left: 4px solid #3498db;
+        color: #2c3e50;
     }
 
     .metric-card.success {
-        background: linear-gradient(135deg, #27ae60 0%, #229954 100%);
-        color: white;
-        border: none;
+        background: rgba(255, 255, 255, 0.85);
+        backdrop-filter: blur(10px);
+        border-left: 4px solid #27ae60;
+        color: #2c3e50;
     }
 
     .metric-card.warning {
-        background: linear-gradient(135deg, #f39c12 0%, #d68910 100%);
-        color: white;
-        border: none;
+        background: rgba(255, 255, 255, 0.85);
+        backdrop-filter: blur(10px);
+        border-left: 4px solid #f39c12;
+        color: #2c3e50;
     }
 
     .metric-card.danger {
-        background: linear-gradient(135deg, #e74c3c 0%, #c0392b 100%);
-        color: white;
-        border: none;
+        background: rgba(255, 255, 255, 0.85);
+        backdrop-filter: blur(10px);
+        border-left: 4px solid #e74c3c;
+        color: #2c3e50;
     }
 
     .metric-card.light {
-        background: #f8f9fa;
-        border: 1px solid #dee2e6;
+        background: rgba(255, 255, 255, 0.85);
+        backdrop-filter: blur(10px);
+        border-left: 4px solid #95a5a6;
+        color: #2c3e50;
     }
 
     /* Upload area */
