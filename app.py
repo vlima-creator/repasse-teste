@@ -11,6 +11,26 @@ st.set_page_config(
     layout="wide",
 )
 
+# Estilo CSS customizado para a área de upload e cards
+st.markdown("""
+    <style>
+    .stFileUploader {
+        background-color: #f8f9fa;
+        border: 2px dashed #ffdb4d;
+        border-radius: 15px;
+        padding: 20px;
+    }
+    .upload-header {
+        text-align: center;
+        padding: 10px;
+        background-color: #fffbf0;
+        border-radius: 10px;
+        margin-bottom: 20px;
+        border: 1px solid #ffeeba;
+    }
+    </style>
+    """, unsafe_allow_html=True)
+
 PT_MONTHS = {
     "janeiro": 1,
     "fevereiro": 2,
@@ -318,43 +338,59 @@ def render_indicator_card(col, icon, title, value, description):
 
 st.title("Painel Financeiro Mercado Livre")
 st.caption(
-    "Faça upload do relatório de vendas do Mercado Livre em Excel e acompanhe faturamento, cancelamentos, comissões, fretes e repasse previsto."
+    "Acompanhe faturamento, cancelamentos, comissões, fretes e repasse previsto com precisão."
 )
 
 with st.sidebar:
-    st.header("Como o cálculo funciona")
+    st.header("📊 Lógica de Cálculo")
     st.markdown(
         """
-        **Faturamento total**  
+        Entenda como cada indicador é calculado com base no seu relatório:
+
+        **1. Faturamento Total**  
         Soma da coluna `Receita por produtos (BRL)`.
 
-        **Vendas canceladas**  
+        **2. Frete Pago pelo Cliente**  
+        Soma da coluna `Receita por envio (BRL)`. Valor pago pelo comprador que entra como receita.
+
+        **3. Vendas Canceladas**  
         Soma absoluta da coluna `Cancelamentos e reembolsos (BRL)`.
 
-        **Comissão total**  
+        **4. Comissão Total**  
         Soma absoluta da coluna `Tarifa de venda e impostos (BRL)`.
 
-        **Frete cobrado total**  
+        **5. Frete Cobrado Total**  
         Soma absoluta da coluna `Tarifas de envio (BRL)`.
 
-        **Repaid / Benefícios**  
-        Diferença entre o `Repasse Previsto` e o `Faturamento Líquido`. Representa bônus de campanhas como CPC.
+        **6. Faturamento Líquido**  
+        `Faturamento` + `Frete Pago pelo Cliente` - `Cancelamentos` - `Comissão` - `Frete Cobrado`.  
+        *Representa o resultado real da sua operação.*
 
-        **Faturamento líquido**  
-        `Faturamento` + `Receita por envio` - cancelamentos - comissão - frete cobrado.
+        **7. Repasse Previsto**  
+        Soma da coluna `Total (BRL)` para pedidos não cancelados.  
+        *É o valor final reportado pelo Mercado Livre.*
 
-        **Repasse previsto**  
-        Soma do `Total (BRL)` para pedidos sem sinal de cancelamento.
+        **8. Repaid / Benefícios**  
+        `Repasse Previsto` - `Faturamento Líquido`.  
+        *Captura bônus extras de campanhas (ex: CPC) ou ajustes do ML.*
+
+        **9. % Cancelamento**  
+        `Cancelamentos` / `Faturamento Total`.
+
+        **10. Peso da Comissão**  
+        `Comissão` / `Faturamento Total`.
         """
     )
-    st.warning(
-        "O repasse previsto é uma estimativa com base nas informações do relatório de vendas. O valor financeiro real pode variar conforme liberações e ajustes do Mercado Livre."
+    st.info(
+        "💡 **Dica:** O Repaid é identificado automaticamente sempre que o valor final do ML for maior que o cálculo base da venda."
     )
 
-uploaded_file = st.file_uploader("Envie o arquivo .xlsx do relatório de vendas", type=["xlsx"])
+# Área de Upload Melhorada
+st.markdown('<div class="upload-header"><h3>📤 Importar Relatório</h3><p>Arraste ou selecione o arquivo .xlsx exportado do Mercado Livre</p></div>', unsafe_allow_html=True)
+uploaded_file = st.file_uploader("", type=["xlsx"], label_visibility="collapsed")
 
 if uploaded_file is None:
-    st.info("Suba uma planilha para começar.")
+    st.info("Aguardando upload da planilha para gerar o painel...")
     st.stop()
 
 try:
