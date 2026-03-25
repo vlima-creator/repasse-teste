@@ -155,8 +155,8 @@ def compute_metrics(df: pd.DataFrame) -> dict:
     pedidos_enviados = int(df["is_sent"].sum()) if "is_sent" in df.columns else 0
 
     # Faturamento Líquido Base (sem benefícios)
-    # Representa o resultado real da venda: Faturamento - Taxas
-    faturamento_liquido = faturamento_total - cancelamentos - comissao - frete_cobrado
+    # Agora inclui a Receita por Envio (BRL) paga pelo cliente no cálculo base
+    faturamento_liquido = faturamento_total + frete_pago_cliente - cancelamentos - comissao - frete_cobrado
 
     # Repasse Previsto (Total reportado para pedidos não cancelados)
     # Representa o valor final que o ML paga (incluindo bônus/repaid)
@@ -341,7 +341,7 @@ with st.sidebar:
         Diferença entre o `Repasse Previsto` e o `Faturamento Líquido`. Representa bônus de campanhas como CPC.
 
         **Faturamento líquido**  
-        `Faturamento` - cancelamentos - comissão - frete cobrado.
+        `Faturamento` + `Receita por envio` - cancelamentos - comissão - frete cobrado.
 
         **Repasse previsto**  
         Soma do `Total (BRL)` para pedidos sem sinal de cancelamento.
@@ -423,7 +423,7 @@ render_metric_card(
     "✅",
     "Faturamento Líquido",
     brl(metrics["faturamento_liquido"]),
-    "Faturamento - taxas",
+    "Faturamento + Frete Cliente - Taxas",
     bg_color="#fffbf0"
 )
 render_metric_card(
