@@ -139,18 +139,24 @@ def clean_dataframe(df: pd.DataFrame) -> pd.DataFrame:
         regex=True,
     )
 
+    # Lógica de cálculo conforme o usuário explicou
     receita_produtos = df.get("Receita por produtos (BRL)", pd.Series(0, index=df.index)).fillna(0)
-    receita_envio = df.get("Receita por envio (BRL)", pd.Series(0, index=df.index)).fillna(0)
-    comissao = df.get("Tarifa de venda e impostos (BRL)", pd.Series(0, index=df.index)).fillna(0).abs()
-    tarifas_envio = df.get("Tarifas de envio (BRL)", pd.Series(0, index=df.index)).fillna(0).abs()
-    cancelamentos = df.get("Cancelamentos e reembolsos (BRL)", pd.Series(0, index=df.index)).fillna(0).abs()
-
+    receita_acrescimo = df.get("Receita por acréscimo no preço (pago pelo comprador)", pd.Series(0, index=df.index)).fillna(0)
+    taxa_parcelamento = df.get("Taxa de parcelamento equivalente ao acréscimo", pd.Series(0, index=df.index)).fillna(0)
+    comissao = df.get("Tarifa de venda e impostos (BRL)", pd.Series(0, index=df.index)).fillna(0)
+    tarifas_envio = df.get("Tarifas de envio (BRL)", pd.Series(0, index=df.index)).fillna(0)
+    cancelamentos = df.get("Cancelamentos e reembolsos (BRL)", pd.Series(0, index=df.index)).fillna(0)
     total_reportado = df.get("Total (BRL)", pd.Series(0, index=df.index)).fillna(0)
-    total_reconstruido = receita_produtos + receita_envio - comissao - tarifas_envio - cancelamentos
-    usar_total_reconstruido = total_reportado.eq(0) & (
-        receita_produtos.ne(0) | receita_envio.ne(0) | comissao.ne(0) | tarifas_envio.ne(0) | cancelamentos.ne(0)
-    )
-    df["repasse_base"] = total_reportado.where(~usar_total_reconstruido, total_reconstruido)
+
+    # Cálculo base (sem benefícios/repaid)
+    # Nota: comissao, tarifas_envio e cancelamentos costumam vir negativos no relatório, por isso somamos
+    df["calculo_base"] = receita_produtos + receita_acrescimo - taxa_parcelamento + comissao + tarifas_envio + cancelamentos
+    
+    # O Repaid é a diferença positiva entre o que o ML reportou e o nosso cálculo base
+    df["repaid_beneficio"] = (total_reportado - df["calculo_base"]).clip(lower=0)
+    
+    # Repasse base é o total reportado
+    df["repasse_base"] = total_reportado
 
     return df
 
@@ -161,12 +167,15 @@ def compute_metrics(df: pd.DataFrame) -> dict:
     cancelamentos = df.get("Cancelamentos e reembolsos (BRL)", pd.Series(dtype=float)).abs().sum()
     comissao = df.get("Tarifa de venda e impostos (BRL)", pd.Series(dtype=float)).abs().sum()
     frete_cobrado = df.get("Tarifas de envio (BRL)", pd.Series(dtype=float)).abs().sum()
+    repaid_total = df.get("repaid_beneficio", pd.Series(0, index=df.index)).sum()
+    
     pedidos_enviados = int(df["is_sent"].sum()) if "is_sent" in df.columns else 0
 
-    faturamento_liquido = faturamento_total + frete_pago_cliente - cancelamentos - comissao - frete_cobrado
+    # Faturamento líquido agora inclui o benefício/repaid
+    faturamento_liquido = faturamento_total + frete_pago_cliente - cancelamentos - comissao - frete_cobrado + repaid_total
 
     nao_cancelados = ~df.get("is_cancelled", pd.Series(False, index=df.index))
-    repasse_previsto = df.loc[nao_cancelados, "repasse_base"].clip(lower=0).sum() if "repasse_base" in df.columns else 0
+    repasse_previsto = df.loc[nao_cancelados, "repasse_base"].sum() if "repasse_base" in df.columns else 0
 
     base_bruta_com_frete = faturamento_total + frete_pago_cliente
 
@@ -176,14 +185,14 @@ def compute_metrics(df: pd.DataFrame) -> dict:
         "cancelamentos": float(cancelamentos),
         "comissao": float(comissao),
         "frete_cobrado": float(frete_cobrado),
+        "repaid_total": float(repaid_total),
         "faturamento_liquido": float(faturamento_liquido),
         "pedidos_enviados": int(pedidos_enviados),
         "repasse_previsto": float(repasse_previsto),
         "repasse_previsto_pct": float(repasse_previsto / base_bruta_com_frete) if base_bruta_com_frete else 0,
         "cancel_pct": float(cancelamentos / faturamento_total) if faturamento_total else 0,
         "comissao_pct": float(comissao / faturamento_total) if faturamento_total else 0,
-        "frete_cobrado_pct": float(frete_cobrado / faturamento_total) if faturamento_total else 0,
-        "frete_pago_cliente_pct": float(frete_pago_cliente / base_bruta_com_frete) if base_bruta_com_frete else 0,
+        "repaid_pct": float(repaid_total / faturamento_total) if faturamento_total else 0,
         "base_bruta_com_frete": float(base_bruta_com_frete),
     }
 
@@ -194,7 +203,7 @@ def dataframe_for_download(df):
         "Canal de venda", "Forma de entrega", "Receita por produtos (BRL)",
         "Receita por envio (BRL)", "Cancelamentos e reembolsos (BRL)",
         "Tarifa de venda e impostos (BRL)", "Tarifas de envio (BRL)",
-        "Total (BRL)", "repasse_base", "is_cancelled", "is_sent"
+        "Total (BRL)", "repaid_beneficio", "repasse_base", "is_cancelled", "is_sent"
     ] if c in df.columns]
     return df[export_cols].copy()
 
@@ -207,6 +216,7 @@ def build_charts(metrics):
             "Cancelado",
             "Comissão",
             "Frete cobrado",
+            "Repaid/Benefícios"
         ],
         "Valor": [
             max(metrics["faturamento_liquido"], 0),
@@ -214,6 +224,7 @@ def build_charts(metrics):
             metrics["cancelamentos"],
             metrics["comissao"],
             metrics["frete_cobrado"],
+            metrics["repaid_total"]
         ],
     })
     fig_donut = px.pie(composicao_df, names="Categoria", values="Valor", hole=0.55)
@@ -242,6 +253,7 @@ def render_metric_card(col, icon, title, value, description, bg_color="white"):
                 padding: 20px;
                 border: 1px solid #e0e0e0;
                 margin-bottom: 10px;
+                height: 160px;
             ">
                 <div style="display: flex; align-items: center; margin-bottom: 12px;">
                     <div style="
@@ -260,7 +272,7 @@ def render_metric_card(col, icon, title, value, description, bg_color="white"):
                 <div style="color: #666; font-size: 12px; margin-bottom: 8px;">
                     {title}
                 </div>
-                <div style="color: #000; font-size: 24px; font-weight: bold; margin-bottom: 8px;">
+                <div style="color: #000; font-size: 22px; font-weight: bold; margin-bottom: 8px;">
                     {value}
                 </div>
                 <div style="color: #999; font-size: 11px;">
@@ -327,11 +339,8 @@ with st.sidebar:
         **Faturamento total**  
         Soma da coluna `Receita por produtos (BRL)`.
 
-        **Frete pago pelo cliente**  
-        Soma da coluna `Receita por envio (BRL)`. Esse valor entra como receita adicional quando o comprador paga o frete.
-
         **Vendas canceladas**  
-        Soma absoluta da coluna `Cancelamentos e reembolsos (BRL)` e leitura do status.
+        Soma absoluta da coluna `Cancelamentos e reembolsos (BRL)`.
 
         **Comissão total**  
         Soma absoluta da coluna `Tarifa de venda e impostos (BRL)`.
@@ -339,12 +348,14 @@ with st.sidebar:
         **Frete cobrado total**  
         Soma absoluta da coluna `Tarifas de envio (BRL)`.
 
+        **Repaid / Benefícios**  
+        Diferença positiva entre o `Total (BRL)` reportado e o cálculo base (Produtos + Acréscimo - Taxas - Frete). Representa bônus de campanhas como CPC.
+
         **Faturamento líquido**  
-        `Receita por produtos` + `Receita por envio` - cancelamentos - comissão - frete cobrado.
+        `Faturamento` - cancelamentos - comissão - frete cobrado + Repaid.
 
         **Repasse previsto**  
-        Soma do `Total (BRL)` para pedidos sem sinal de cancelamento ou reembolso. Quando o `Total (BRL)` vier vazio ou zerado, o app reconstrói o valor com a lógica:
-        `Receita por produtos` + `Receita por envio` - `Comissão` - `Frete cobrado` - `Cancelamentos`.
+        Soma do `Total (BRL)` para pedidos sem sinal de cancelamento.
         """
     )
     st.warning(
@@ -373,8 +384,8 @@ if missing_cols:
 # ========== SEÇÃO DE CARDS PRINCIPAIS ==========
 st.markdown("---")
 
-# Primeira linha de cards
-col1, col2, col3 = st.columns(3, gap="medium")
+# Primeira linha de cards (4 colunas para acomodar o Repaid)
+col1, col2, col3, col4 = st.columns(4, gap="small")
 render_metric_card(
     col1, 
     "💵", 
@@ -399,11 +410,19 @@ render_metric_card(
     "Tarifa de venda e impostos",
     bg_color="#fffbf0"
 )
-
-# Segunda linha de cards
-col4, col5, col6 = st.columns(3, gap="medium")
 render_metric_card(
     col4,
+    "🎁",
+    "Repaid / Benefícios",
+    brl(metrics["repaid_total"]),
+    "Bônus de campanhas (CPC, etc)",
+    bg_color="#f0fff4" # Verde clarinho para destacar benefício
+)
+
+# Segunda linha de cards
+col5, col6, col7, col8 = st.columns(4, gap="small")
+render_metric_card(
+    col5,
     "🚚",
     "Frete Cobrado Total",
     brl(metrics["frete_cobrado"]),
@@ -411,27 +430,35 @@ render_metric_card(
     bg_color="white"
 )
 render_metric_card(
-    col5,
+    col6,
     "✅",
     "Faturamento Líquido",
     brl(metrics["faturamento_liquido"]),
-    "Faturamento - cancelamentos - frete - comissão",
+    "Faturamento - taxas + benefícios",
     bg_color="#fffbf0"
 )
 render_metric_card(
-    col6,
+    col7,
     "📦",
     "Repasse Previsto",
     brl(metrics["repasse_previsto"]),
     "Valor previsto conforme relatório",
     bg_color="#fffbf0"
 )
+render_metric_card(
+    col8,
+    "📈",
+    "Pedidos Enviados",
+    str(metrics["pedidos_enviados"]),
+    "Total de pedidos com status de envio",
+    bg_color="white"
+)
 
 # ========== SEÇÃO DE INDICADORES ==========
 st.markdown("---")
 st.subheader("Indicadores")
 
-ind_col1, ind_col2 = st.columns(2, gap="medium")
+ind_col1, ind_col2, ind_col3 = st.columns(3, gap="medium")
 render_indicator_card(
     ind_col1,
     "📊",
@@ -445,6 +472,13 @@ render_indicator_card(
     "Peso da Comissão",
     pct(metrics["comissao_pct"]),
     "sobre o faturamento total"
+)
+render_indicator_card(
+    ind_col3,
+    "✨",
+    "Impacto Benefícios",
+    pct(metrics["repaid_pct"]),
+    "ganho extra sobre faturamento"
 )
 
 st.markdown("---")
@@ -465,9 +499,10 @@ st.subheader("Insights automáticos")
 insight_col1, insight_col2, insight_col3 = st.columns(3)
 insight_col1.success(f"Cancelamentos representam {pct(metrics['cancel_pct'])} do faturamento de produtos.")
 insight_col2.info(f"A comissão consome {pct(metrics['comissao_pct'])} do faturamento de produtos.")
-insight_col3.warning(
-    f"O cliente pagou {brl(metrics['frete_pago_cliente'])} em frete, equivalente a {pct(metrics['frete_pago_cliente_pct'])} da base bruta considerada."
-)
+if metrics["repaid_total"] > 0:
+    insight_col3.success(f"Você recebeu {brl(metrics['repaid_total'])} em benefícios extras (Repaid).")
+else:
+    insight_col3.warning("Nenhum benefício extra (Repaid) detectado neste relatório.")
 
 st.subheader("Filtros")
 f1, f2, f3 = st.columns(3)
@@ -512,10 +547,10 @@ summary_text = f"""
 Painel Financeiro Mercado Livre
 
 Faturamento total: {brl(metrics['faturamento_total'])}
-Frete pago pelo cliente: {brl(metrics['frete_pago_cliente'])}
 Vendas canceladas: {brl(metrics['cancelamentos'])}
 Comissão total: {brl(metrics['comissao'])}
 Frete cobrado total: {brl(metrics['frete_cobrado'])}
+Repaid / Benefícios: {brl(metrics['repaid_total'])}
 Faturamento líquido: {brl(metrics['faturamento_liquido'])}
 Repasse previsto: {brl(metrics['repasse_previsto'])}
 Percentual de cancelamento: {pct(metrics['cancel_pct'])}
