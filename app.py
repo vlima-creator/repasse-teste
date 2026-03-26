@@ -590,15 +590,15 @@ repasse_pct = (metrics["repasse_previsto"] / metrics["base_bruta_com_frete"] * 1
 with col_result1:
     render_metric_card(st.columns(1)[0], "◆", "Repasse Previsto", brl(metrics["repasse_previsto"]), "Valor final a receber", "primary", f"{repasse_pct:.1f}% da base bruta", "#27ae60")
 with col_result2:
-    render_metric_card(st.columns(1)[0], "↑", "Pedidos Enviados", str(metrics["pedidos_enviados"]), "Total de pedidos", "light")
+    render_metric_card(st.columns(1)[0], "↑", "Pedidos Enviados", str(metrics["pedidos_enviados"]), "Total de pedidos", "light", None, None)
 
 # ========== SEÇÃO 4: INDICADORES ==========
 st.markdown("### Indicadores de Performance")
 ind_col1, ind_col2 = st.columns(2, gap="large")
 with ind_col1:
-    render_metric_card(st.columns(1)[0], "↓", "% Cancelamento", pct(metrics["cancel_pct"]), "Sobre faturamento total", "light")
+    render_metric_card(st.columns(1)[0], "↓", "% Cancelamento", pct(metrics["cancel_pct"]), "Sobre faturamento total", "light", None, "#e74c3c")
 with ind_col2:
-    render_metric_card(st.columns(1)[0], "◆", "Peso da Comissão", pct(metrics["comissao_pct"]), "Sobre faturamento total", "light")
+    render_metric_card(st.columns(1)[0], "◆", "Peso da Comissão", pct(metrics["comissao_pct"]), "Sobre faturamento total", "light", None, "#e74c3c")
 
 # ========== GRÁFICOS ==========
 st.markdown("### Análise Visual")
