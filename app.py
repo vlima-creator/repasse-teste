@@ -474,25 +474,24 @@ def build_charts(metrics):
 def render_metric_card(col, icon, title, value, description, card_type="light", percentage=None, percentage_color=None):
     """Renderiza um card de métrica profissional com porcentagem opcional"""
     with col:
-        percentage_html = ""
-        if percentage is not None:
+        percentage_section = ""
+        if percentage is not None and percentage != "":
             color = percentage_color if percentage_color else "#7f8c8d"
-            percentage_html = f'<div style="font-size: 14px; color: {color}; margin-top: 6px; font-weight: 700;">{percentage}</div>'
+            percentage_section = f'<div style="font-size: 14px; color: {color}; margin-top: 6px; font-weight: 700;">{percentage}</div>'
         
-        st.markdown(
-            f"""
-            <div class="metric-card {card_type}">
-                <div style="display: flex; align-items: flex-start; justify-content: space-between; margin-bottom: 15px;">
-                    <div style="font-size: 28px;">{icon}</div>
-                </div>
-                <div style="font-size: 13px; opacity: 0.8; margin-bottom: 8px; font-weight: 500;">{title}</div>
-                <div style="font-size: 28px; font-weight: 700; margin-bottom: 8px;">{value}</div>
-                {percentage_html}
-                <div style="font-size: 12px; opacity: 0.7; margin-top: 8px;">{description}</div>
+        card_html = f"""
+        <div class="metric-card {card_type}">
+            <div style="display: flex; align-items: flex-start; justify-content: space-between; margin-bottom: 15px;">
+                <div style="font-size: 28px;">{icon}</div>
             </div>
-            """,
-            unsafe_allow_html=True
-        )
+            <div style="font-size: 13px; opacity: 0.8; margin-bottom: 8px; font-weight: 500;">{title}</div>
+            <div style="font-size: 28px; font-weight: 700; margin-bottom: 8px;">{value}</div>
+            {percentage_section}
+            <div style="font-size: 12px; opacity: 0.7; margin-top: 8px;">{description}</div>
+        </div>
+        """
+        
+        st.markdown(card_html, unsafe_allow_html=True)
 
 
 # ========== HEADER ==========
