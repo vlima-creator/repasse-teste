@@ -347,6 +347,68 @@ def dataframe_for_download(df):
     return df[export_cols].copy()
 
 
+def analyze_product_profitability(df):
+    """Analisa lucratividade por produto"""
+    if "Título do anúncio" not in df.columns:
+        return pd.DataFrame()
+    
+    product_analysis = df.groupby("Título do anúncio").agg({
+        "Receita por produtos (BRL)": "sum",
+        "Receita por envio (BRL)": "sum",
+        "Cancelamentos e reembolsos (BRL)": lambda x: x.abs().sum(),
+        "Tarifa de venda e impostos (BRL)": lambda x: x.abs().sum(),
+        "Tarifas de envio (BRL)": lambda x: x.abs().sum(),
+        "N.º de venda": "count",
+    }).reset_index()
+    
+    product_analysis.columns = ["Produto", "Faturamento", "Frete Cliente", "Cancelamentos", "Comissão", "Frete Cobrado", "Vendas"]
+    product_analysis["Líquido"] = (product_analysis["Faturamento"] + product_analysis["Frete Cliente"] - 
+                                     product_analysis["Cancelamentos"] - product_analysis["Comissão"] - 
+                                     product_analysis["Frete Cobrado"])
+    product_analysis["Margem %"] = (product_analysis["Líquido"] / (product_analysis["Faturamento"] + product_analysis["Frete Cliente"])) * 100
+    
+    return product_analysis.sort_values("Líquido", ascending=False)
+
+
+def build_temporal_chart(df):
+    """Constrói gráfico de tendência temporal"""
+    if "data_venda_dt" not in df.columns or df["data_venda_dt"].isna().all():
+        return None
+    
+    daily_data = df.groupby(df["data_venda_dt"].dt.date).agg({
+        "Receita por produtos (BRL)": "sum",
+        "Receita por envio (BRL)": "sum",
+        "Cancelamentos e reembolsos (BRL)": lambda x: x.abs().sum(),
+        "Tarifa de venda e impostos (BRL)": lambda x: x.abs().sum(),
+        "Tarifas de envio (BRL)": lambda x: x.abs().sum(),
+    }).reset_index()
+    
+    daily_data.columns = ["Data", "Faturamento", "Frete Cliente", "Cancelamentos", "Comissão", "Frete Cobrado"]
+    daily_data["Líquido"] = (daily_data["Faturamento"] + daily_data["Frete Cliente"] - 
+                              daily_data["Cancelamentos"] - daily_data["Comissão"] - daily_data["Frete Cobrado"])
+    daily_data["Repasse"] = daily_data["Líquido"]  # Simplificado para visualização
+    
+    fig = go.Figure()
+    fig.add_trace(go.Scatter(x=daily_data["Data"], y=daily_data["Faturamento"], mode="lines+markers", name="Faturamento", line=dict(color="#3498db", width=2)))
+    fig.add_trace(go.Scatter(x=daily_data["Data"], y=daily_data["Líquido"], mode="lines+markers", name="Faturamento Líquido", line=dict(color="#27ae60", width=2)))
+    fig.add_trace(go.Scatter(x=daily_data["Data"], y=daily_data["Comissão"], mode="lines+markers", name="Comissão", line=dict(color="#e74c3c", width=2)))
+    
+    fig.update_layout(
+        title="Tendência de Faturamento e Custos",
+        xaxis_title="Data",
+        yaxis_title="Valor (R$)",
+        font=dict(family="Segoe UI, sans-serif", size=12, color="#2c3e50"),
+        paper_bgcolor="rgba(0,0,0,0)",
+        plot_bgcolor="rgba(0,0,0,0)",
+        xaxis=dict(showgrid=False, zeroline=False),
+        yaxis=dict(showgrid=True, gridcolor="#ecf0f1", zeroline=False),
+        hovermode="x unified",
+        height=400,
+    )
+    
+    return fig
+
+
 def build_charts(metrics):
     # Gráfico de Pizza - Composição
     composicao_df = pd.DataFrame({
@@ -593,6 +655,56 @@ if selected_status:
 
 if selected_canais and "Canal de venda" in filtered_df.columns:
     filtered_df = filtered_df[filtered_df["Canal de venda"].isin(selected_canais)]
+
+# ========== ANÁLISE DE LUCRATIVIDADE POR PRODUTO ==========
+st.markdown("### Análise de Lucratividade por Produto")
+product_profitability = analyze_product_profitability(filtered_df)
+
+if not product_profitability.empty:
+    # Gráfico de barras
+    fig_products = go.Figure(data=[
+        go.Bar(
+            x=product_profitability["Produto"][:10],  # Top 10
+            y=product_profitability["Líquido"][:10],
+            marker=dict(color=product_profitability["Margem %"][:10], colorscale="RdYlGn", showscale=True, colorbar=dict(title="Margem %")),
+            text=[f"R$ {v:.2f}" for v in product_profitability["Líquido"][:10]],
+            textposition="outside",
+        )
+    ])
+    fig_products.update_layout(
+        title="Top 10 Produtos por Faturamento Líquido",
+        xaxis_title="Produto",
+        yaxis_title="Faturamento Líquido (R$)",
+        font=dict(family="Segoe UI, sans-serif", size=11, color="#2c3e50"),
+        paper_bgcolor="rgba(0,0,0,0)",
+        plot_bgcolor="rgba(0,0,0,0)",
+        xaxis=dict(showgrid=False, zeroline=False, tickangle=-45),
+        yaxis=dict(showgrid=True, gridcolor="#ecf0f1", zeroline=False),
+        height=400,
+        margin=dict(b=100),
+    )
+    st.plotly_chart(fig_products, use_container_width=True)
+    
+    # Tabela de detalhes
+    st.markdown("#### Detalhes de Lucratividade")
+    product_display = product_profitability[["Produto", "Faturamento", "Frete Cliente", "Comissão", "Frete Cobrado", "Líquido", "Margem %", "Vendas"]].copy()
+    product_display["Faturamento"] = product_display["Faturamento"].apply(brl)
+    product_display["Frete Cliente"] = product_display["Frete Cliente"].apply(brl)
+    product_display["Comissão"] = product_display["Comissão"].apply(brl)
+    product_display["Frete Cobrado"] = product_display["Frete Cobrado"].apply(brl)
+    product_display["Líquido"] = product_display["Líquido"].apply(brl)
+    product_display["Margem %"] = product_display["Margem %"].apply(lambda x: f"{x:.1f}%")
+    st.dataframe(product_display, use_container_width=True, height=300)
+else:
+    st.info("Sem dados de produtos para análise.")
+
+# ========== GRÁFICO DE TENDÊNCIA TEMPORAL ==========
+st.markdown("### Tendência Temporal")
+temporal_chart = build_temporal_chart(filtered_df)
+if temporal_chart:
+    st.plotly_chart(temporal_chart, use_container_width=True)
+else:
+    st.info("Sem dados temporais para análise. Verifique se as datas estão corretas no relatório.")
 
 # ========== TABELA ==========
 st.markdown("### Detalhamento de Pedidos")
