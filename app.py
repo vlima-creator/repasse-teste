@@ -650,27 +650,40 @@ st.markdown("### Análise de Lucratividade por Produto")
 product_profitability = analyze_product_profitability(filtered_df)
 
 if not product_profitability.empty:
-    # Gráfico de barras
+    # Gráfico de barras horizontal com melhor legibilidade
+    top_products = product_profitability.head(10).sort_values("Líquido", ascending=True)
+    
     fig_products = go.Figure(data=[
         go.Bar(
-            x=product_profitability["Produto"][:10],  # Top 10
-            y=product_profitability["Líquido"][:10],
-            marker=dict(color=product_profitability["Margem %"][:10], colorscale="RdYlGn", showscale=True, colorbar=dict(title="Margem %")),
-            text=[f"R$ {v:.2f}" for v in product_profitability["Líquido"][:10]],
+            y=top_products["Produto"],
+            x=top_products["Líquido"],
+            orientation="h",
+            marker=dict(
+                color=top_products["Margem %"],
+                colorscale="RdYlGn",
+                showscale=True,
+                colorbar=dict(title="Margem %", thickness=15, len=0.7),
+                line=dict(color="rgba(0,0,0,0.1)", width=1)
+            ),
+            text=[f"R$ {v:,.2f} ({m:.1f}%)" for v, m in zip(top_products["Líquido"], top_products["Margem %"])],
             textposition="outside",
+            textfont=dict(size=11, color="#2c3e50"),
+            hovertemplate="<b>%{y}</b><br>Líquido: R$ %{x:,.2f}<br>Vendas: %{customdata}<extra></extra>",
+            customdata=top_products["Vendas"],
         )
     ])
     fig_products.update_layout(
         title="Top 10 Produtos por Faturamento Líquido",
-        xaxis_title="Produto",
-        yaxis_title="Faturamento Líquido (R$)",
-        font=dict(family="Segoe UI, sans-serif", size=11, color="#2c3e50"),
+        xaxis_title="Faturamento Líquido (R$)",
+        yaxis_title="Produto",
+        font=dict(family="Segoe UI, sans-serif", size=12, color="#2c3e50"),
         paper_bgcolor="rgba(0,0,0,0)",
         plot_bgcolor="rgba(0,0,0,0)",
-        xaxis=dict(showgrid=False, zeroline=False, tickangle=-45),
-        yaxis=dict(showgrid=True, gridcolor="#ecf0f1", zeroline=False),
-        height=400,
-        margin=dict(b=100),
+        xaxis=dict(showgrid=True, gridcolor="#ecf0f1", zeroline=False),
+        yaxis=dict(showgrid=False, zeroline=False),
+        height=450,
+        margin=dict(l=250, r=100, t=50, b=50),
+        hovermode="closest",
     )
     st.plotly_chart(fig_products, use_container_width=True)
     
