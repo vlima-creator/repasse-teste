@@ -667,7 +667,7 @@ if not product_profitability.empty:
             ),
             text=[f"R$ {v:,.2f} ({m:.1f}%)" for v, m in zip(top_products["Líquido"], top_products["Margem %"])],
             textposition="outside",
-            textfont=dict(size=11, color="#2c3e50"),
+            textfont=dict(size=11, color="#ffffff", family="Segoe UI, sans-serif"),
             hovertemplate="<b>%{y}</b><br>Líquido: R$ %{x:,.2f}<br>Vendas: %{customdata}<extra></extra>",
             customdata=top_products["Vendas"],
         )
