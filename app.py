@@ -713,48 +713,9 @@ st.markdown("### Detalhamento de Pedidos")
 download_df = dataframe_for_download(filtered_df)
 st.dataframe(download_df, use_container_width=True, height=420)
 
-# ========== DOWNLOADS ==========
-st.markdown("### Exportar Dados")
-col_csv, col_txt = st.columns(2, gap="medium")
-
-with col_csv:
-    csv_data = download_df.to_csv(index=False).encode("utf-8-sig")
-    st.download_button(
-        "Baixar CSV",
-        data=csv_data,
-        file_name="pedidos_filtrados_mercado_livre.csv",
-        mime="text/csv",
-    )
-
-with col_txt:
-    summary_text = f"""
-PAINEL FINANCEIRO MERCADO LIVRE
-{'='*50}
-
-RECEITAS:
-  Faturamento Total: {brl(metrics['faturamento_total'])}
-  Frete Pago pelo Cliente: {brl(metrics['frete_pago_cliente'])}
-  Base Bruta: {brl(metrics['base_bruta_com_frete'])}
-
-CUSTOS:
-  Cancelamentos: {brl(metrics['cancelamentos'])}
-  Comissão: {brl(metrics['comissao'])}
-  Frete Cobrado: {brl(metrics['frete_cobrado'])}
-
-RESULTADO:
-  Faturamento Líquido: {brl(metrics['faturamento_liquido'])}
-  Repaid/Benefícios: {brl(metrics['repaid_total'])}
-  Repasse Previsto: {brl(metrics['repasse_previsto'])}
-
-INDICADORES:
-  % Cancelamento: {pct(metrics['cancel_pct'])}
-  Peso da Comissão: {pct(metrics['comissao_pct'])}
-  Pedidos Enviados: {metrics['pedidos_enviados']}
-    """.strip()
-    
-    st.download_button(
-        "Baixar Resumo TXT",
-        data=summary_text.encode("utf-8"),
-        file_name="resumo_financeiro_mercado_livre.txt",
-        mime="text/plain",
-    )
+# ========== RODAPÉ ==========
+st.divider()
+st.markdown(
+    '<div style="text-align: center; padding: 20px; font-size: 12px; color: #7f8c8d; margin-top: 30px;">© Desenvolvido por Vinicius Lima / CNPJ: 47.192.694/0001-70</div>',
+    unsafe_allow_html=True
+)
